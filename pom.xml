@@ -4,20 +4,20 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.vaadin.addons.mygroup</groupId>
-    <artifactId>addon-example</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-    <name>Add-on for Vaadin</name>
-    <description>###Project Name###</description>
+    <groupId>org.vaadin.addons.joelpop</groupId>
+    <artifactId>flow-app-nav-layout</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <name>Vaadin Flow App Nav Layout</name>
+    <description>Opinionated responsive navigation sidebar layout for Vaadin applications</description>
 
     <properties>
-        <vaadin.version>25.2.1</vaadin.version>
-        <maven.compiler.release>21</maven.compiler.release>
+        <vaadin.version>25.1.9</vaadin.version>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
     <organization>
-        <name>###author###</name>
+        <name>Joel Robertson</name>
     </organization>
     <licenses>
         <license>
@@ -83,6 +83,15 @@
 
     <build>
         <defaultGoal>jetty:run</defaultGoal>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -104,7 +113,7 @@
                     <excludes>
                         <exclude>META-INF/VAADIN/config/flow-build-info.json</exclude>
                     </excludes>
-                </configuration>                     
+                </configuration>
             </plugin>
 
             <plugin>

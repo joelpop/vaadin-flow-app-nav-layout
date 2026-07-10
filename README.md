@@ -1,59 +1,172 @@
-# Vaadin Add-on example project
+# vaadin-flow-app-nav-layout
 
-An empty project for creating a Vaadin add-on. You should start from this project if your add-on's components are based on the existing Vaadin classes or doesn't use 3rd party JavaScript modules.
+A Vaadin Flow base layout providing adaptive navigation: a bottom icon bar with secondary tabs on phones, a permanent left-strip rail on portrait tablets, and a drawer-based `SideNav` on desktop. Extends `AppLayout` and wires all nav components automatically from Vaadin's `@Menu`-annotated routes.
 
-## Add-on architecture
-![server-side-addon](https://user-images.githubusercontent.com/991105/211870086-75544597-847d-4d21-82fa-341411753558.svg)
+## Table of Contents
 
-## Alternative add-on templates
+- [How it works](#how-it-works)
+- [Usage](#usage)
+- [Configuration reference](#configuration-reference)
+- [Nav grouping](#nav-grouping)
+- [NavSelector](#navselector)
+- [View header integration](#view-header-integration)
+- [Supporting types](#supporting-types)
+- [Development](#development)
+  - [Running the demo](#running-the-demo)
+  - [Integration tests](#integration-tests)
+- [Publishing to Vaadin Directory](#publishing-to-vaadin-directory)
 
-If you wish to build and publish an add-on or extension in [Vaadin Directory](https://vaadin.com/directory), Vaadin provides the following three template projects:
- 1. **(this repo)** [vaadin/addon-template](https://github.com/vaadin/addon-template): Create a composite component. This Java-only template is the easiest when extending Vaadin Java components.
- 2. [vaadin/client-server-addon-template](https://github.com/vaadin/client-server-addon-template): Build a standalone, client-server TypeScript-Java component. This template provides you with a [Lit-based](https://github.com/lit/lit/) example to start with.
- 3. [vaadin/npm-addon-template](https://github.com/vaadin/npm-addon-template): Wrap a web component from [npmjs.com](https://npmjs.com/) as a Vaadin Java component.
+## How it works
 
+**Phone (touch device)**
+- **Bottom tab bar** — up to 4 primary sections shown as icon+label tiles; excess sections overflow into a popover triggered by a `···` (ellipsis) icon
+- **Secondary tab bar** — appears below the top header when the current route has sibling routes at depth 2; replaced by a back button at depth 3+
 
-## Development instructions
+**Portrait tablet**
+- **Rail** — a permanent narrow strip on the left showing icons; a swipe-in drawer holds overflow content
 
-### Important Files 
-* TheAddon.java: this is the addon-on component class. You can add more classes if you wish, including other Components.
-* TestView.java: A View class that let's you test the component you are building. This and other classes in the test folder will not be packaged during the build. You can add more test view classes in this package.
-* assembly/: this folder includes configuration for packaging the project into a JAR so that it works well with other Vaadin projects and the Vaadin Directory. There is usually no need to modify these files, unless you need to add JAR manifest entries.
+**Desktop / landscape tablet**
+- **Side navigation drawer** — hierarchical `SideNav` with icon-prefixed group headers, collapsed by default, toggled by a `DrawerToggle` in the header
 
-Stylesheets loaded with `@StyleSheet` and static resources such as images go under the `/src/main/resources/META-INF/resources` directory. JS modules (e.g. templates), and CSS files that should be included in the frontend bundle and loaded with `@CssImport`, go under the `/src/main/resources/META-INF/frontend` directory. See the [Resource Cheat Sheet](https://vaadin.com/docs/latest/flow/advanced/loading-resources#resource-cheat-sheet) for more details.
+The nav type re-evaluates dynamically on touch devices whenever the viewport size changes (rotation, split-screen resize), switching components in place without a page reload.
 
-### Deployment
+## Usage
 
-Starting the test/demo server:
+Extend `AppNavLayout`, annotate with `@Layout`, and configure in the constructor:
+
+```java
+@Layout
+public class MainLayout extends AppNavLayout {
+
+    public MainLayout(@Value("${spring.application.name:App}") String appTitle) {
+        super(appTitle, NavSelector.defaultSelector());
+
+        setViewIconGenerator(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(ViewIcon.class))
+                .map(a -> a.value().create())
+                .orElse(null));
+
+        setViewTitleGenerator(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(PageTitle.class))
+                .map(PageTitle::value)
+                .orElse(null));
+
+        setViewNavGroupResolver(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(MenuGroup.class))
+                .map(MenuGroup::value)
+                .orElse(null));
+
+        setNavPathMatcher((currentPath, navItemPath) -> {
+            var currentSegs = new Location(currentPath).getSegments();
+            var navItemSegs = new Location(navItemPath).getSegments();
+            return !navItemSegs.isEmpty()
+                    && currentSegs.size() >= navItemSegs.size()
+                    && currentSegs.subList(0, navItemSegs.size()).equals(navItemSegs);
+        });
+
+        addBrandContent(new H1(getAppTitle()));
+    }
+
+    @Override
+    protected Component createHeadroomComponent() {
+        return AppHeadroom.create(); // optional; requires vaadin-flow-app-headroom
+    }
+}
+```
+
+All configuration calls take effect immediately, even after the component is attached.
+
+## Configuration reference
+
+| Method | Default | Purpose |
+|--------|---------|---------|
+| `addBrandContent(Component...)` | — | Logo/title in the header (desktop) or drawer top (mobile) |
+| `setUserMenu(Component)` | — | User widget in the header trailing (desktop) or drawer bottom (mobile) |
+| `setViewIconGenerator(Function<MenuEntry, Icon>)` | no icon | Icon for each leaf nav item |
+| `setViewTitleGenerator(Function<MenuEntry, String>)` | `@Menu#title()` | Label for each leaf nav item |
+| `setViewNavGroupResolver(Function<MenuEntry, NavGroup>)` | path-based | Explicit group assignment for a view |
+| `setNavPathMatcher(BiPredicate<String, String>)` | `String::equals` | Active-item path matching |
+| `setNavGrouper(NavGrouper)` | `PathPrefixNavGrouper` | Full grouping strategy override |
+| `setNavNodeRenderer(ComponentRenderer<SideNavItem, NavNode>)` | built-in | Custom desktop `SideNavItem` renderer |
+| `createHeadroomComponent()` | `null` (no headroom) | Optional scroll-hide header component |
+
+## Nav grouping
+
+`NavGrouper` is a `@FunctionalInterface` with a single method `NavNode nodeFor(MenuEntry)`. It maps each route entry to its position in the nav tree via `NavNode` parent links.
+
+The default implementation, `PathPrefixNavGrouper`, groups routes by their first URL path segment. When a `NavGroup` resolver is also configured (via `setViewNavGroupResolver`), pre-warming entries with explicit groups causes their path siblings to merge into the same group automatically.
+
+To use a fully custom grouping strategy, implement `NavGrouper` and pass it to `setNavGrouper()`.
+
+## NavSelector
+
+`NavSelector` is a `@FunctionalInterface` — `NavType select(DeviceType, Orientation)` — that determines which nav component to render for a given session. Pass it to the `AppNavLayout` constructor.
+
+`NavSelector.defaultSelector()` returns the standard mapping:
+- Desktop → `SIDENAV`
+- Tablet landscape → `SIDENAV`
+- Tablet portrait → `RAIL`
+- Phone → `TOUCH`
+
+Supply a custom lambda to override, e.g., to always use `SIDENAV` for testing.
+
+## View header integration
+
+Views can contribute content to the adaptive header slot without coupling to layout internals:
+
+**`HasViewHeaderTitle`** — contributes an icon + title row (desktop only). Override `getViewHeaderIcon()` to supply an `Icon`; the `@PageTitle` value is read automatically. Override `getViewHeaderSuffix()` to append a badge or other trailing component.
+
+**`HasViewHeaderComponent`** — contributes an action component shown on both desktop and mobile (e.g., a search bar or toolbar).
+
+Both interfaces provide no-op defaults; implement only what is needed.
+
+## Supporting types
+
+| Type | Description |
+|------|-------------|
+| `NavType` | `TOUCH`, `RAIL`, `SIDENAV` — the active nav style |
+| `DeviceType` | `PHONE`, `TABLET`, `DESKTOP` — detected from touch capability and screen size |
+| `Orientation` | `PORTRAIT`, `LANDSCAPE` — re-evaluated on window resize for touch devices |
+| `NavGroup` | Interface: `title()`, `icon()`, `parent()` — metadata for an explicit group node |
+| `NavNode` | Immutable tree node: either a navigable leaf (`menuEntry()` present) or a non-navigable group |
+| `RouteNavUtils` | Static helpers: `pathSegments`, `normalizedPath`, `routeSegmentLabel`, `rootPrefix`, `leafTitle` |
+
+## Development
+
+### Running the demo
+
 ```
 mvn jetty:run -Pdevelopment
 ```
 
-This deploys demo at http://localhost:8080
- 
-### Integration test
+Starts the test/demo server at http://localhost:8080.
 
-To run Integration Tests, execute `mvn verify -Pit,production`.
+### Integration tests
 
-Tests run by default in `headless` mode, to avoid browser windows to be opened for every test.
-This behaviour is always disabled when running the tests in debug mode in the IDE
-or when running maven with the `-Dmaven.failsafe.debug` sytem property.
-On normal execution, headless mode can be deactivated using the `-Dtest.headless=false` system property.
+```
+mvn verify -Pit,production
+```
+
+Tests run in headless mode by default. To disable headless mode:
+
+```
+mvn verify -Pit,production -Dtest.headless=false
+```
 
 ## Publishing to Vaadin Directory
 
 You should change the `organization.name` property in `pom.xml` to your own name/organization.
 
-```
-    <organization>
-        <name>###author###</name>
-    </organization>
+```xml
+<organization>
+    <name>###author###</name>
+</organization>
 ```
 
 You can create the zip package needed for [Vaadin Directory](https://vaadin.com/directory/) using
 
 ```
-mvn versions:set -DnewVersion=1.0.0 # You cannot publish snapshot versions 
+mvn versions:set -DnewVersion=1.0.0 # You cannot publish snapshot versions
 mvn clean package -Pdirectory
 ```
 

@@ -1,0 +1,76 @@
+package org.vaadin.addons.joelpop.appnavlayout.ui.nav;
+
+import com.vaadin.flow.router.Location;
+import com.vaadin.flow.server.menu.MenuEntry;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Stateless helpers for navigating the route hierarchy.
+ * {@code @Menu} titles are leaf-only display names; all structural logic
+ * (depth, grouping, prefix matching) uses the {@code @Route} template path.
+ */
+public final class RouteNavUtils {
+
+    private RouteNavUtils() {}
+
+    /**
+     * Returns the path segments of a route path as an immutable list.
+     * An empty path (e.g. the root {@code ""}) returns an empty list.
+     * Strips a leading {@code /} so both {@code "catalog/products"} and
+     * {@code "/catalog/products"} return {@code ["catalog", "products"]}.
+     */
+    public static List<String> pathSegments(String routePath) {
+        var p = routePath != null && routePath.startsWith("/") ? routePath.substring(1) : routePath;
+        return new Location(p).getSegments();
+    }
+
+    /**
+     * Returns the path from a {@link MenuEntry} with any leading {@code /}
+     * stripped, matching the format returned by
+     * {@link com.vaadin.flow.router.Location#getPath()}.
+     * <p>{@code MenuEntry.path()} returns {@code "/catalog/products"};
+     * this method returns {@code "catalog/products"}.
+     */
+    public static String normalizedPath(MenuEntry entry) {
+        var p = entry.path();
+        return p != null && p.startsWith("/") ? p.substring(1) : p;
+    }
+
+    /**
+     * Converts a URL route segment to a human-readable label by capitalising
+     * each hyphen-delimited word.
+     * <p>{@code "catalog"} → {@code "Catalog"},
+     * {@code "audit-log"} → {@code "Audit Log"}.
+     */
+    public static String routeSegmentLabel(String segment) {
+        return Arrays.stream(segment.split("-"))
+                .map(w -> w.isEmpty() ? w : Character.toUpperCase(w.charAt(0)) + w.substring(1))
+                .collect(Collectors.joining(" "));
+    }
+
+    /**
+     * Returns a human-readable label for the root section that owns this entry.
+     * For depth-1 routes (empty path, e.g. the root view) the {@code @Menu} title
+     * is used directly. For deeper routes the first URL segment is converted via
+     * {@link #routeSegmentLabel(String)}.
+     */
+    public static String rootPrefix(MenuEntry entry) {
+        var segs = pathSegments(entry.path());
+        if (segs.isEmpty() || segs.getFirst().isEmpty()) {
+            return entry.title() != null ? entry.title() : "";
+        }
+        return routeSegmentLabel(segs.getFirst());
+    }
+
+    /**
+     * Returns the {@code @Menu} title as the leaf display name.
+     * Falls back to the path when no title is present.
+     */
+    public static String leafTitle(MenuEntry entry) {
+        return entry.title() != null ? entry.title() : entry.path();
+    }
+
+}
