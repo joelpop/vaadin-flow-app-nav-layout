@@ -117,14 +117,14 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // In Vaadin 25.2 this will be replaced by UI.routerStateSignal().map(RouterState::currentView).
     private final ValueSignal<Component> currentViewSignal = new ValueSignal<>(null);
 
-    private final ValueSignal<Function<MenuEntry, Icon>>                   viewIconGeneratorSignal    = new ValueSignal<>(m -> null);
-    private final ValueSignal<Function<MenuEntry, String>>                 viewTitleGeneratorSignal   = new ValueSignal<>(m -> null);
-    private final ValueSignal<Function<MenuEntry, NavGroup>>               viewNavGroupResolverSignal = new ValueSignal<>(m -> null);
-    private final ValueSignal<BiPredicate<String, String>>                 navPathMatcherSignal       = new ValueSignal<>(String::equals);
-    private final ValueSignal<NavGrouper>                                  navGrouperSignal           = new ValueSignal<>(new PathPrefixNavGrouper()
-            .setNavGroupDefResolver(e -> viewNavGroupResolverSignal.peek().apply(e))
-            .setViewIconGenerator(e -> Optional.ofNullable(viewIconGeneratorSignal.peek().apply(e))));
-    private final ValueSignal<ComponentRenderer<SideNavItem, NavNode>>     navNodeRendererSignal      = new ValueSignal<>(defaultNavNodeRenderer());
+    private Function<MenuEntry, Icon>                               viewIconGenerator    = m -> null;
+    private Function<MenuEntry, String>                             viewTitleGenerator   = m -> null;
+    private Function<MenuEntry, NavGroup>                           viewNavGroupResolver = m -> null;
+    private BiPredicate<String, String>                             navPathMatcher       = String::equals;
+    private NavGrouper                                              navGrouper           = new PathPrefixNavGrouper()
+            .setNavGroupDefResolver(e -> viewNavGroupResolver.apply(e))
+            .setViewIconGenerator(e -> Optional.ofNullable(viewIconGenerator.apply(e)));
+    private ComponentRenderer<SideNavItem, NavNode>                 navNodeRenderer      = defaultNavNodeRenderer();
     private boolean navBuilt = false;
     private boolean navPopulated = false;
 
@@ -170,20 +170,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
         Signal.effect(this, () -> rebuildViewHeader(currentViewSignal.get()));
 
-        Signal.effect(this, () -> {
-            viewIconGeneratorSignal.get();
-            viewTitleGeneratorSignal.get();
-            viewNavGroupResolverSignal.get();
-            navPathMatcherSignal.get();
-            navGrouperSignal.get();
-            navNodeRendererSignal.get();
-
-            if (navPopulated) {
-                navPopulated = false;
-                navGrouperSignal.peek().reset();
-                populateNav();
-            }
-        });
     }
 
     // ——————————— Nav-type switching ————————————
@@ -327,23 +313,28 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void populateNav() {
-        var resolver = viewNavGroupResolverSignal.peek();
-        var grouper  = navGrouperSignal.peek();
-
         // Pre-warm NavGroup-based nodes so path-based siblings merge with them.
         MenuConfiguration.getMenuEntries().stream()
-                .filter(e -> resolver.apply(e) != null)
-                .forEach(grouper::nodeFor);
+                .filter(e -> viewNavGroupResolver.apply(e) != null)
+                .forEach(navGrouper::nodeFor);
 
         if (mobile) {
-            touchNavBar.setPathMatcher(navPathMatcherSignal.peek());
-            touchSecondaryTabBar.setNavGrouper(grouper);
-            touchNavBar.setNavGrouper(grouper);
+            touchNavBar.setPathMatcher(navPathMatcher);
+            touchSecondaryTabBar.setNavGrouper(navGrouper);
+            touchNavBar.setNavGrouper(navGrouper);
         }
         else {
             populateSideNav();
         }
         navPopulated = true;
+    }
+
+    private void repopulateNav() {
+        if (navPopulated) {
+            navPopulated = false;
+            navGrouper.reset();
+            populateNav();
+        }
     }
 
     @Override
@@ -385,17 +376,20 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      * Default: {@link String#equals} (exact match).
      */
     protected void setNavPathMatcher(BiPredicate<String, String> matcher) {
-        navPathMatcherSignal.set(matcher);
+        navPathMatcher = matcher;
+        repopulateNav();
     }
 
     /** Overrides the nav grouping strategy. Default: {@link PathPrefixNavGrouper}. */
     protected void setNavGrouper(NavGrouper grouper) {
-        navGrouperSignal.set(grouper);
+        navGrouper = grouper;
+        repopulateNav();
     }
 
     /** Overrides the {@link SideNavItem} renderer for the desktop side nav. */
     protected void setNavNodeRenderer(ComponentRenderer<SideNavItem, NavNode> renderer) {
-        navNodeRendererSignal.set(renderer);
+        navNodeRenderer = renderer;
+        repopulateNav();
     }
 
     /**
@@ -403,17 +397,20 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      * Return {@code null} to use path-based grouping for an entry.
      */
     protected void setViewNavGroupResolver(Function<MenuEntry, NavGroup> resolver) {
-        viewNavGroupResolverSignal.set(resolver);
+        viewNavGroupResolver = resolver;
+        repopulateNav();
     }
 
     /** Sets the icon generator for leaf nav items. Return {@code null} to show no icon. */
     protected void setViewIconGenerator(Function<MenuEntry, Icon> generator) {
-        viewIconGeneratorSignal.set(generator);
+        viewIconGenerator = generator;
+        repopulateNav();
     }
 
     /** Sets the title generator for leaf nav items. Return {@code null} to fall back to {@code @Menu#title()}. */
     protected void setViewTitleGenerator(Function<MenuEntry, String> generator) {
-        viewTitleGeneratorSignal.set(generator);
+        viewTitleGenerator = generator;
+        repopulateNav();
     }
 
     // ——————————— Navigation-driven view header ————————————
@@ -487,14 +484,12 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     private void populateSideNav() {
         sideNav.removeAll();
-        var grouper   = navGrouperSignal.peek();
-        var renderer  = navNodeRendererSignal.peek();
         var sideNavItems = new LinkedHashMap<NavNode, SideNavItem>();
 
         MenuConfiguration.getMenuEntries().forEach(entry -> {
-            var node = grouper.nodeFor(entry);
-            ensureAncestors(node, sideNavItems, renderer);
-            var item = renderer.createComponent(node);
+            var node = navGrouper.nodeFor(entry);
+            ensureAncestors(node, sideNavItems, navNodeRenderer);
+            var item = navNodeRenderer.createComponent(node);
             sideNavItems.put(node, item);
             node.parent()
                     .ifPresentOrElse(
@@ -521,17 +516,17 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private ComponentRenderer<SideNavItem, NavNode> defaultNavNodeRenderer() {
         return new ComponentRenderer<>(node -> {
             var title = node.menuEntry()
-                    .map(e -> Optional.ofNullable(viewTitleGeneratorSignal.peek().apply(e)).orElseGet(node::title))
+                    .map(e -> Optional.ofNullable(viewTitleGenerator.apply(e)).orElseGet(node::title))
                     .orElseGet(node::title);
             var item = node.menuEntry()
                     .map(e -> {
                         var navItem = new SideNavItem(title, RouteNavUtils.normalizedPath(e));
-                        navItem.setMatchNested(navPathMatcherSignal.peek().test("a/b", "a"));
+                        navItem.setMatchNested(navPathMatcher.test("a/b", "a"));
                         return navItem;
                     })
                     .orElseGet(() -> new SideNavItem(title));
             var icon = node.menuEntry()
-                    .flatMap(e -> Optional.ofNullable(viewIconGeneratorSignal.peek().apply(e)))
+                    .flatMap(e -> Optional.ofNullable(viewIconGenerator.apply(e)))
                     .or(node::icon);
             icon.ifPresent(item::setPrefixComponent);
             return item;
