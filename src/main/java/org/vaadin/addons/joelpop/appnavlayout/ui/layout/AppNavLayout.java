@@ -18,6 +18,7 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
+import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -77,7 +78,21 @@ import java.util.function.Function;
  * <p>{@link #addToNavbar(Component...)} is preserved as an escape hatch.
  *
  * <p>All environment-specific values are supplied by the subclass constructor.
+ *
+ * <p><b>Rail mode is built entirely from standard {@code AppLayout} constructs.</b>
+ * The rail is {@code AppLayout}'s own {@code navbar-bottom} slot (the same slot
+ * the ordinary touch bottom bar uses), repositioned and restyled via CSS keyed
+ * on the {@code nav-rail} attribute this class sets on itself — not a distinct
+ * part of its own. This is deliberate: any code that only understands
+ * {@code AppLayout}'s standard {@code navbar-top}/{@code navbar-bottom} contract
+ * (for example, an unrelated add-on that hides/shows those bars on scroll) can
+ * interoperate with rail mode automatically, without this class or that add-on
+ * ever needing to know about each other. See {@link #onNavTypeChanged} for the
+ * one generic, headroom-agnostic hook that exists to let application code
+ * bridge such an add-on in explicitly, for cases where automatic inference
+ * isn't reliable enough on its own.
  */
+@JsModule("./app-nav-layout.ts")
 public abstract class AppNavLayout extends AppLayout implements AfterNavigationObserver {
 
     private static final int TABLET_MIN_SHORT_SIDE_PX = 768;
@@ -200,6 +215,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             populateNav();
             rebuildViewHeader(currentViewSignal.peek());
         }
+
+        onNavTypeChanged(navType);
     }
 
     private void tearDownNav() {
@@ -460,6 +477,41 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      */
     protected Component createHeadroomComponent() {
         return null;
+    }
+
+    /**
+     * Called whenever the active {@link NavType} is determined — including on
+     * initial construction, not just on later changes. Default is a no-op.
+     *
+     * <p>This hook is deliberately generic: {@code AppNavLayout} has no
+     * knowledge of what a subclass does with this notification, or of any
+     * specific companion component. It exists so that application code
+     * combining {@code AppNavLayout} with some other layout-aware add-on has
+     * somewhere to react when the nav type changes.
+     *
+     * <p>For example, an application using both {@code AppNavLayout} and a
+     * separate scroll-hiding add-on that exposes an explicit per-bar pin
+     * override might override this to keep the rail from ever being hidden:
+     * <pre>{@code
+     * private AppHeadroom myHeadroom;
+     *
+     * protected Component createHeadroomComponent() {
+     *     myHeadroom = AppHeadroom.create();
+     *     return myHeadroom;
+     * }
+     *
+     * protected void onNavTypeChanged(NavType navType) {
+     *     if (myHeadroom != null) {
+     *         myHeadroom.setBottomBarPinned(navType == NavType.RAIL);
+     *     }
+     * }
+     * }</pre>
+     * (See rail mode's note in this class's own Javadoc for why this is only
+     * necessary in cases where automatic inference isn't reliable enough —
+     * the rail also generally works without any of this, since it's built
+     * entirely from standard {@code AppLayout} constructs.)
+     */
+    protected void onNavTypeChanged(NavType navType) {
     }
 
     /** Application title supplied by the subclass. */
