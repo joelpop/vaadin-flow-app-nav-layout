@@ -83,14 +83,9 @@ import java.util.function.Function;
  * The rail is {@code AppLayout}'s own {@code navbar-bottom} slot (the same slot
  * the ordinary touch bottom bar uses), repositioned and restyled via CSS keyed
  * on the {@code nav-rail} attribute this class sets on itself — not a distinct
- * part of its own. This is deliberate: any code that only understands
+ * part of its own. Any companion component that understands
  * {@code AppLayout}'s standard {@code navbar-top}/{@code navbar-bottom} contract
- * (for example, an unrelated add-on that hides/shows those bars on scroll) can
- * interoperate with rail mode automatically, without this class or that add-on
- * ever needing to know about each other. See {@link #onNavTypeChanged} for the
- * one generic, headroom-agnostic hook that exists to let application code
- * bridge such an add-on in explicitly, for cases where automatic inference
- * isn't reliable enough on its own.
+ * therefore interoperates with rail mode automatically.
  */
 @JsModule("./app-nav-layout.ts")
 public abstract class AppNavLayout extends AppLayout implements AfterNavigationObserver {
@@ -117,7 +112,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private VerticalLayout userDrawerSlot;
     private TouchSecondaryTabBar touchSecondaryTabBar;
     private TouchNavBar touchNavBar;
-    private Component headroom;
     private NavType activeNavType;
 
     // Buffered brand/user content — survives nav-type switches
@@ -223,10 +217,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         if (mobile) {
             topBar.remove(touchSecondaryTabBar);
             touchNavBar.getElement().removeFromParent();
-            if (headroom != null) {
-                headroom.getElement().removeFromParent();
-                headroom = null;
-            }
             brandDrawerSlot.getElement().removeFromParent();
             userDrawerSlot.getElement().removeFromParent();
             touchSecondaryTabBar = null;
@@ -280,10 +270,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
                 setDrawerOpened(false);
             }
 
-            headroom = createHeadroomComponent();
-            if (headroom != null) {
-                getElement().appendChild(headroom.getElement());
-            }
             // touch-optimized ensures the navbar-bottom slot is rendered by AppLayout
             getStyle().set("--vaadin-app-layout-touch-optimized", "true");
             super.addToDrawer(brandDrawerSlot, userDrawerSlot);
@@ -472,44 +458,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // ——————————— Protected hooks ————————————
 
     /**
-     * Returns the headroom component to append to the layout on mobile/rail nav.
-     * Default returns {@code null} (no headroom behavior). Override to supply one.
-     */
-    protected Component createHeadroomComponent() {
-        return null;
-    }
-
-    /**
      * Called whenever the active {@link NavType} is determined — including on
      * initial construction, not just on later changes. Default is a no-op.
-     *
-     * <p>This hook is deliberately generic: {@code AppNavLayout} has no
-     * knowledge of what a subclass does with this notification, or of any
-     * specific companion component. It exists so that application code
-     * combining {@code AppNavLayout} with some other layout-aware add-on has
-     * somewhere to react when the nav type changes.
-     *
-     * <p>For example, an application using both {@code AppNavLayout} and a
-     * separate scroll-hiding add-on that exposes an explicit per-bar pin
-     * override might override this to keep the rail from ever being hidden:
-     * <pre>{@code
-     * private AppHeadroom myHeadroom;
-     *
-     * protected Component createHeadroomComponent() {
-     *     myHeadroom = AppHeadroom.create();
-     *     return myHeadroom;
-     * }
-     *
-     * protected void onNavTypeChanged(NavType navType) {
-     *     if (myHeadroom != null) {
-     *         myHeadroom.setBottomBarPinned(navType == NavType.RAIL);
-     *     }
-     * }
-     * }</pre>
-     * (See rail mode's note in this class's own Javadoc for why this is only
-     * necessary in cases where automatic inference isn't reliable enough —
-     * the rail also generally works without any of this, since it's built
-     * entirely from standard {@code AppLayout} constructs.)
+     * Override to react to nav-type changes in subclass or companion code.
      */
     protected void onNavTypeChanged(NavType navType) {
     }
