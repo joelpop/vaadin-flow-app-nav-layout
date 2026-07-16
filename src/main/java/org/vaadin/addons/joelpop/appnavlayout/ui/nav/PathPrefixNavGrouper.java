@@ -5,8 +5,8 @@ import com.vaadin.flow.server.menu.MenuEntry;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Default {@link NavGrouper} — derives the navigation hierarchy from route path
@@ -26,8 +26,8 @@ import java.util.function.Function;
  */
 public final class PathPrefixNavGrouper implements NavGrouper {
 
-    private Function<MenuEntry, NavGroup>        navGroupDefResolver = e -> null;
-    private Function<MenuEntry, Optional<Icon>>  viewIconGenerator   = e -> Optional.empty();
+    private Function<MenuEntry, NavGroup>       navGroupDefResolver = e -> null;
+    private Function<MenuEntry, Supplier<Icon>> viewIconGenerator   = e -> null;
 
     private final Map<String, NavNode> cache            = new LinkedHashMap<>();
     private final Map<NavGroup, NavNode> defCache        = new LinkedHashMap<>();
@@ -40,7 +40,7 @@ public final class PathPrefixNavGrouper implements NavGrouper {
     }
 
     /** Sets the icon generator for path-based group nodes; default returns no icon. */
-    public PathPrefixNavGrouper setViewIconGenerator(Function<MenuEntry, Optional<Icon>> generator) {
+    public PathPrefixNavGrouper setViewIconGenerator(Function<MenuEntry, Supplier<Icon>> generator) {
         this.viewIconGenerator = generator;
         return this;
     }
@@ -85,11 +85,11 @@ public final class PathPrefixNavGrouper implements NavGrouper {
                     }
                 }
                 var label = RouteNavUtils.routeSegmentLabel(segs.get(idx));
-                var icon = viewIconGenerator.apply(entry).orElse(null);
+                var iconSupplier = viewIconGenerator.apply(entry);
                 var parent = parentPath != null ? cache.get(parentPath) : null;
                 return parent != null
-                        ? NavNode.of(label, icon, parent)
-                        : NavNode.of(label, icon);
+                        ? NavNode.of(label, iconSupplier, parent)
+                        : NavNode.of(label, iconSupplier);
             });
         }
 
@@ -105,4 +105,5 @@ public final class PathPrefixNavGrouper implements NavGrouper {
                     : NavNode.of(d.title(), d.icon());
         });
     }
+
 }

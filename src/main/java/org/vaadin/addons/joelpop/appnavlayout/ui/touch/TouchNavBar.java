@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiPredicate;
+import java.util.function.Supplier;
 
 /**
  * Icon navigation bar for touch devices, rendered as a bottom bar
@@ -110,7 +111,7 @@ public class TouchNavBar extends FlexLayout {
             var rootNode = e.getKey();
             var rep = e.getValue();
             var item = navItem(rootNode.title(),
-                               rootNode.icon().orElse(VaadinIcon.CIRCLE.create()),
+                               rootNode.createIcon().orElse(VaadinIcon.CIRCLE.create()),
                                RouteNavUtils.normalizedPath(rep));
             navItems.put(rootNode, item);
             add(item);
@@ -120,7 +121,7 @@ public class TouchNavBar extends FlexLayout {
             var overflow = all.subList(primaryCount, all.size()).stream()
                     .map(Map.Entry::getValue)
                     .toList();
-            var overflowNode = NavNode.of("__overflow__", (Icon) null);
+            var overflowNode = NavNode.of("__overflow__", (Supplier<Icon>) null);
             var hamburger = navItem("More", VaadinIcon.ELLIPSIS_DOTS_H.create(), null);
             navItems.put(overflowNode, hamburger);
             add(hamburger);
@@ -189,7 +190,7 @@ public class TouchNavBar extends FlexLayout {
         for (var entry : entries) {
             var rootNode = rootNodeFor(entry);
             var btn = new Button(rootNode.title(),
-                                 rootNode.icon().orElse(VaadinIcon.CIRCLE.create()), _ -> {
+                                 rootNode.createIcon().orElse(VaadinIcon.CIRCLE.create()), _ -> {
                 UI.getCurrent().navigate(RouteNavUtils.normalizedPath(entry));
                 popover.close();
             });

@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Base application layout providing adaptive navigation: a bottom icon bar
@@ -126,13 +127,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // In Vaadin 25.2 this will be replaced by UI.routerStateSignal().map(RouterState::currentView).
     private final ValueSignal<Component> currentViewSignal = new ValueSignal<>(null);
 
-    private Function<MenuEntry, Icon>                               viewIconGenerator    = m -> null;
+    private Function<MenuEntry, Supplier<Icon>>                     viewIconGenerator    = m -> null;
     private Function<MenuEntry, String>                             viewTitleGenerator   = m -> null;
     private Function<MenuEntry, NavGroup>                           viewNavGroupResolver = m -> null;
     private BiPredicate<String, String>                             navPathMatcher       = String::equals;
     private NavGrouper                                              navGrouper           = new PathPrefixNavGrouper()
             .setNavGroupDefResolver(e -> viewNavGroupResolver.apply(e))
-            .setViewIconGenerator(e -> Optional.ofNullable(viewIconGenerator.apply(e)));
+            .setViewIconGenerator(e -> viewIconGenerator.apply(e));
     private ComponentRenderer<SideNavItem, NavNode>                 navNodeRenderer      = defaultNavNodeRenderer();
     private boolean navBuilt = false;
     private boolean navPopulated = false;
@@ -404,8 +405,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         repopulateNav();
     }
 
-    /** Sets the icon generator for leaf nav items. Return {@code null} to show no icon. */
-    protected void setViewIconGenerator(Function<MenuEntry, Icon> generator) {
+    /** Sets the icon generator for leaf nav items. Return {@code null} or a supplier returning {@code null} to show no icon. */
+    protected void setViewIconGenerator(Function<MenuEntry, Supplier<Icon>> generator) {
         viewIconGenerator = generator;
         repopulateNav();
     }
@@ -529,8 +530,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
                     })
                     .orElseGet(() -> new SideNavItem(title));
             var icon = node.menuEntry()
-                    .flatMap(e -> Optional.ofNullable(viewIconGenerator.apply(e)))
-                    .or(node::icon);
+                    .flatMap(e -> Optional.ofNullable(viewIconGenerator.apply(e)).map(Supplier::get))
+                    .or(node::createIcon);
             icon.ifPresent(item::setPrefixComponent);
             return item;
         });
