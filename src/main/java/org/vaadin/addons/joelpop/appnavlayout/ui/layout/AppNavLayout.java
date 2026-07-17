@@ -91,11 +91,12 @@ import java.util.function.Supplier;
 @JsModule("./app-nav-layout.ts")
 public abstract class AppNavLayout extends AppLayout implements AfterNavigationObserver {
 
-    private static final int TABLET_MIN_SHORT_SIDE_PX = 768;
+    private static final int DEFAULT_TABLET_MIN_SHORT_SIDE_PX = 768;
 
-    private final String appTitle;
-    private final NavSelector navSelector;
-    private final DeviceType deviceType;
+    private String appTitle = "";
+    private NavSelector navSelector = NavSelector.defaultSelector();
+    private int tabletMinShortSidePx = DEFAULT_TABLET_MIN_SHORT_SIDE_PX;
+    private DeviceType deviceType;
     private boolean mobile;
 
     // Always-present layout containers
@@ -138,14 +139,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private boolean navBuilt = false;
     private boolean navPopulated = false;
 
-    protected AppNavLayout(String appTitle, NavSelector navSelector) {
-        this.appTitle = appTitle;
-        this.navSelector = navSelector;
-
-        // Null until async client-details round-trip completes; callers must null-check.
-        var details = UI.getCurrent().getPage().getExtendedClientDetails();
-        this.deviceType = detectDeviceType(details);
-
+    protected AppNavLayout() {
         super.setPrimarySection(Section.DRAWER);
 
         topBar = new HorizontalLayout();
@@ -167,28 +161,24 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         topBlock.add(topBar, viewHeaderSlot);
         super.addToNavbar(topBlock);
 
-        applyNavType(navSelector.select(deviceType, detectOrientation(details)));
-
-        if (details != null && details.isTouchDevice()) {
-            var page = UI.getCurrent().getPage();
-            Signal.effect(this, () -> {
-                var size = page.windowSizeSignal().get();
-                var orientation = size.width() >= size.height()
-                        ? Orientation.LANDSCAPE : Orientation.PORTRAIT;
-                applyNavType(navSelector.select(deviceType, orientation));
-            });
-        }
-
         Signal.effect(this, () -> rebuildViewHeader(currentViewSignal.get()));
+    }
 
+    protected AppNavLayout(String appTitle) {
+        this();
+        this.appTitle = appTitle;
+    }
+
+    protected AppNavLayout(String appTitle, NavSelector navSelector) {
+        this(appTitle);
+        this.navSelector = navSelector;
     }
 
     // ——————————— Nav-type switching ————————————
 
     private void applyNavType(NavType navType) {
         if (navBuilt && navType == this.activeNavType) {
-            // Same type: only populate if the UI is now available but wasn't before.
-            if (!navPopulated && getUI().isPresent()) {
+            if (!navPopulated) {
                 populateNav();
                 rebuildViewHeader(currentViewSignal.peek());
             }
@@ -206,11 +196,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         buildNav();
         navBuilt = true;
         placeBrandAndUserContent();
-
-        if (getUI().isPresent()) {
-            populateNav();
-            rebuildViewHeader(currentViewSignal.peek());
-        }
+        populateNav();
+        rebuildViewHeader(currentViewSignal.peek());
 
         onNavTypeChanged(navType);
     }
@@ -299,6 +286,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void placeBrandAndUserContent() {
+        if (!navBuilt) {
+            return;
+        }
         if (mobile) {
             brandDrawerSlot.removeAll();
             bufferedBrandContent.forEach(brandDrawerSlot::add);
@@ -345,8 +335,18 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
-        if (!navPopulated) {
-            populateNav();
+        // Null until async client-details round-trip completes; callers must null-check.
+        var details = attachEvent.getUI().getPage().getExtendedClientDetails();
+        deviceType = detectDeviceType(details, tabletMinShortSidePx);
+        applyNavType(navSelector.select(deviceType, detectOrientation(details)));
+        if (deviceType != DeviceType.DESKTOP) {
+            var page = attachEvent.getUI().getPage();
+            Signal.effect(this, () -> {
+                var size = page.windowSizeSignal().get();
+                var orientation = size.width() >= size.height()
+                        ? Orientation.LANDSCAPE : Orientation.PORTRAIT;
+                applyNavType(navSelector.select(deviceType, orientation));
+            });
         }
     }
 
@@ -461,7 +461,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     /**
      * Called whenever the active {@link NavType} is determined — including on
-     * initial construction, not just on later changes. Default is a no-op.
+     * first attachment, not just on later changes. Default is a no-op.
      * Override to react to nav-type changes in subclass or companion code.
      */
     protected void onNavTypeChanged(NavType navType) {
@@ -538,14 +538,63 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         });
     }
 
+    // ——————————— Device configuration API ————————————
+
+    /**
+     * Overrides the physical-screen-shorter-side threshold, in CSS pixels,
+     * used to distinguish {@link DeviceType#TABLET} from {@link DeviceType#PHONE}
+     * among touch devices (default {@code 768}, matching
+     * {@code vaadin-flow-app-headroom}'s equivalent device detection).
+     *
+     * <p>If the layout is already attached, device type is re-evaluated and the
+     * nav type re-applied immediately.
+     *
+     * @return this, for chaining
+     * @throws IllegalArgumentException if {@code px} is negative
+     */
+    public AppNavLayout setTabletMinShortSidePx(int px) {
+        requireNonNegative(px, "tabletMinShortSidePx");
+        this.tabletMinShortSidePx = px;
+        getUI().ifPresent(ui -> {
+            var details = ui.getPage().getExtendedClientDetails();
+            deviceType = detectDeviceType(details, tabletMinShortSidePx);
+            applyNavType(navSelector.select(deviceType, detectOrientation(details)));
+        });
+        return this;
+    }
+
+    /**
+     * Overrides the strategy used to select the {@link NavType} for a given
+     * device type and orientation. Default: {@link NavSelector#defaultSelector()}.
+     *
+     * <p>If the layout is already attached, the nav type is re-evaluated and
+     * re-applied immediately.
+     *
+     * @return this, for chaining
+     */
+    public AppNavLayout setNavSelector(NavSelector selector) {
+        this.navSelector = selector;
+        getUI().ifPresent(ui -> {
+            var details = ui.getPage().getExtendedClientDetails();
+            applyNavType(navSelector.select(deviceType, detectOrientation(details)));
+        });
+        return this;
+    }
+
+    /** Updates the application title returned by {@link #getAppTitle()}. */
+    public AppNavLayout setAppTitle(String title) {
+        this.appTitle = title;
+        return this;
+    }
+
     // ——————————— Device detection ————————————
 
-    private static DeviceType detectDeviceType(ExtendedClientDetails details) {
+    private static DeviceType detectDeviceType(ExtendedClientDetails details, int tabletMinShortSidePx) {
         if (details == null || !details.isTouchDevice()) {
             return DeviceType.DESKTOP;
         }
         int minDim = Math.min(details.getScreenWidth(), details.getScreenHeight());
-        return minDim >= TABLET_MIN_SHORT_SIDE_PX ? DeviceType.TABLET : DeviceType.PHONE;
+        return minDim >= tabletMinShortSidePx ? DeviceType.TABLET : DeviceType.PHONE;
     }
 
     private static Orientation detectOrientation(ExtendedClientDetails details) {
@@ -554,5 +603,11 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         }
         return details.getWindowInnerWidth() >= details.getWindowInnerHeight()
                 ? Orientation.LANDSCAPE : Orientation.PORTRAIT;
+    }
+
+    private static void requireNonNegative(int value, String paramName) {
+        if (value < 0) {
+            throw new IllegalArgumentException(paramName + " must be non-negative, got: " + value);
+        }
     }
 }
