@@ -142,6 +142,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         this.appTitle = appTitle;
         this.navSelector = navSelector;
 
+        // Null until async client-details round-trip completes; callers must null-check.
         var details = UI.getCurrent().getPage().getExtendedClientDetails();
         this.deviceType = detectDeviceType(details);
 
@@ -168,7 +169,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
         applyNavType(navSelector.select(deviceType, detectOrientation(details)));
 
-        if (details.isTouchDevice()) {
+        if (details != null && details.isTouchDevice()) {
             var page = UI.getCurrent().getPage();
             Signal.effect(this, () -> {
                 var size = page.windowSizeSignal().get();
@@ -540,7 +541,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // ——————————— Device detection ————————————
 
     private static DeviceType detectDeviceType(ExtendedClientDetails details) {
-        if (!details.isTouchDevice()) {
+        if (details == null || !details.isTouchDevice()) {
             return DeviceType.DESKTOP;
         }
         int minDim = Math.min(details.getScreenWidth(), details.getScreenHeight());
@@ -548,6 +549,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private static Orientation detectOrientation(ExtendedClientDetails details) {
+        if (details == null) {
+            return Orientation.LANDSCAPE;
+        }
         return details.getWindowInnerWidth() >= details.getWindowInnerHeight()
                 ? Orientation.LANDSCAPE : Orientation.PORTRAIT;
     }

@@ -75,6 +75,11 @@ public class TouchSecondaryTabBar extends HorizontalLayout {
      * [← Back] + the depth-3 siblings under the same two-segment parent prefix.
      */
     private void rebuildForPath(String path) {
+        if (navGrouper == null) {
+            setVisible(false);
+            return;
+        }
+
         var entries = MenuConfiguration.getMenuEntries();
 
         var current = entries.stream()
