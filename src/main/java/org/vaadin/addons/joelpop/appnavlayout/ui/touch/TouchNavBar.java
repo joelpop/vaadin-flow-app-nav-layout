@@ -51,6 +51,7 @@ public class TouchNavBar extends FlexLayout {
     private NavGrouper navGrouper;
     private BiPredicate<String, String> pathMatcher = String::equals;
     private int maxIcons = 5;
+    private NavNode overflowNode;
     private final Map<NavNode, Div>    navItems        = new LinkedHashMap<>();
     private final Map<NavNode, Button> overflowButtons = new LinkedHashMap<>();
 
@@ -97,6 +98,7 @@ public class TouchNavBar extends FlexLayout {
         removeAll();
         navItems.clear();
         overflowButtons.clear();
+        overflowNode = null;
 
         var rootRoutes = new LinkedHashMap<NavNode, MenuEntry>();
         for (var entry : MenuConfiguration.getMenuEntries()) {
@@ -121,7 +123,7 @@ public class TouchNavBar extends FlexLayout {
             var overflow = all.subList(primaryCount, all.size()).stream()
                     .map(Map.Entry::getValue)
                     .toList();
-            var overflowNode = NavNode.of("__overflow__", (Supplier<Icon>) null);
+            overflowNode = NavNode.of("More", (Supplier<Icon>) null);
             var hamburger = navItem("More", VaadinIcon.ELLIPSIS_DOTS_H.create(), null);
             navItems.put(overflowNode, hamburger);
             add(hamburger);
@@ -141,7 +143,7 @@ public class TouchNavBar extends FlexLayout {
 
         navItems.forEach((root, item) -> {
             var active = root.equals(currentRootNode)
-                    || (root.title().equals("__overflow__") && overflowActive);
+                    || (root == overflowNode && overflowActive);
             item.getElement().getClassList().set("active", active);
         });
 
