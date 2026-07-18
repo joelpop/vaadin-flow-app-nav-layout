@@ -97,7 +97,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private NavSelector navSelector = NavSelector.defaultSelector();
     private int tabletMinShortSidePx = DEFAULT_TABLET_MIN_SHORT_SIDE_PX;
     private DeviceType deviceType;
-    private boolean mobile;
 
     // Always-present layout containers
     private final HorizontalLayout topBar;
@@ -192,7 +191,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         }
 
         this.activeNavType = navType;
-        this.mobile = (navType != NavType.SIDENAV);
         buildNav();
         navBuilt = true;
         placeBrandAndUserContent();
@@ -203,7 +201,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void tearDownNav() {
-        if (mobile) {
+        if (activeNavType != NavType.SIDENAV) {
             topBar.remove(touchSecondaryTabBar);
             touchNavBar.getElement().removeFromParent();
             brandDrawerSlot.getElement().removeFromParent();
@@ -231,7 +229,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void buildNav() {
-        if (mobile) {
+        if (activeNavType != NavType.SIDENAV) {
             touchSecondaryTabBar = new TouchSecondaryTabBar(navigationSignal);
             touchSecondaryTabBar.getStyle().set("min-width", "0");
             topBar.add(touchSecondaryTabBar);
@@ -289,7 +287,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         if (!navBuilt) {
             return;
         }
-        if (mobile) {
+        if (activeNavType != NavType.SIDENAV) {
             brandDrawerSlot.removeAll();
             bufferedBrandContent.forEach(brandDrawerSlot::add);
             userDrawerSlot.removeAll();
@@ -313,7 +311,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
                 .filter(e -> viewNavGroupResolver.apply(e) != null)
                 .forEach(navGrouper::nodeFor);
 
-        if (mobile) {
+        if (activeNavType != NavType.SIDENAV) {
             touchNavBar.setPathMatcher(navPathMatcher);
             touchSecondaryTabBar.setNavGrouper(navGrouper);
             touchNavBar.setNavGrouper(navGrouper);
@@ -439,7 +437,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
         viewHeaderSlot.removeAll();
 
-        if (mobile) {
+        if (activeNavType != NavType.SIDENAV) {
             viewHeaderSlot.setVisible(actionComponent != null);
             if (actionComponent != null) {
                 viewHeaderSlot.add(actionComponent);
@@ -474,7 +472,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     /** Whether this session is using touch or rail nav (not desktop SideNav). */
     protected boolean isMobile() {
-        return mobile;
+        return activeNavType != null && activeNavType != NavType.SIDENAV;
     }
 
     // ——————————— Escape hatch ————————————
