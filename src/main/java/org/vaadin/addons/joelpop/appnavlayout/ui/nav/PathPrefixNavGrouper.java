@@ -15,9 +15,8 @@ import java.util.function.Supplier;
  * <p>Group metadata comes from a {@link NavGroup} resolver when set, falling back to
  * humanised path segment labels. Leaf titles come from {@link RouteNavUtils#leafTitle(MenuEntry)}.
  * Leaf icons come from the configured {@code viewIconGenerator} (default: none).
- * Path-based group icons come from {@code groupIconGenerator} keyed by partial path
- * (e.g. {@code "catalog"} or {@code "catalog/admin"}); default: no icon.
- * {@link NavGroup}-based group icons always come from {@link NavGroup#icon()}.
+ * Path-based group nodes carry no icon; use a {@link NavGroup} resolver with
+ * {@link NavGroup#icon()} to assign icons to groups.
  *
  * <p>When a {@link NavGroup} resolver assigns a root group to any view, all views
  * sharing the same first path segment are merged into that group automatically,
@@ -31,7 +30,6 @@ public final class PathPrefixNavGrouper implements NavGrouper {
 
     private Function<MenuEntry, NavGroup>       navGroupDefResolver = e -> null;
     private Function<MenuEntry, Supplier<Icon>> viewIconGenerator   = e -> null;
-    private Function<String, Supplier<Icon>>    groupIconGenerator  = s -> null;
 
     private final Map<String, NavNode> cache            = new LinkedHashMap<>();
     private final Map<NavGroup, NavNode> defCache        = new LinkedHashMap<>();
@@ -46,17 +44,6 @@ public final class PathPrefixNavGrouper implements NavGrouper {
     /** Sets the icon generator for leaf nav nodes; default returns no icon. */
     public PathPrefixNavGrouper setViewIconGenerator(Function<MenuEntry, Supplier<Icon>> generator) {
         this.viewIconGenerator = generator;
-        return this;
-    }
-
-    /**
-     * Sets the icon generator for path-based group nodes. The key is the partial
-     * route path of the group (e.g. {@code "catalog"} or {@code "catalog/admin"}).
-     * Default returns no icon. {@link NavGroup}-based groups are unaffected — their
-     * icons always come from {@link NavGroup#icon()}.
-     */
-    public PathPrefixNavGrouper setGroupIconGenerator(Function<String, Supplier<Icon>> generator) {
-        this.groupIconGenerator = generator;
         return this;
     }
 
@@ -100,7 +87,7 @@ public final class PathPrefixNavGrouper implements NavGrouper {
                     }
                 }
                 var label = RouteNavUtils.routeSegmentLabel(segs.get(idx));
-                var iconSupplier = groupIconGenerator.apply(partialPath);
+                Supplier<Icon> iconSupplier = null;
                 var parent = parentPath != null ? cache.get(parentPath) : null;
                 return parent != null
                         ? NavNode.of(label, iconSupplier, parent)
