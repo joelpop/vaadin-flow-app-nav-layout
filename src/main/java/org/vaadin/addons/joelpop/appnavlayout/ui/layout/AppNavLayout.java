@@ -128,13 +128,15 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // In Vaadin 25.2 this will be replaced by UI.routerStateSignal().map(RouterState::currentView).
     private final ValueSignal<Component> currentViewSignal = new ValueSignal<>(null);
 
-    private Function<MenuEntry, Supplier<Icon>>                     viewIconGenerator    = m -> null;
-    private Function<MenuEntry, String>                             viewTitleGenerator   = m -> null;
-    private Function<MenuEntry, NavGroup>                           viewNavGroupResolver = m -> null;
-    private BiPredicate<String, String>                             navPathMatcher       = String::equals;
-    private NavGrouper                                              navGrouper           = new PathPrefixNavGrouper()
+    private Function<MenuEntry, Supplier<Icon>>                     viewIconGenerator      = m -> null;
+    private Function<String,    Supplier<Icon>>                     viewGroupIconGenerator = s -> null;
+    private Function<MenuEntry, String>                             viewTitleGenerator     = m -> null;
+    private Function<MenuEntry, NavGroup>                           viewNavGroupResolver   = m -> null;
+    private BiPredicate<String, String>                             navPathMatcher         = String::equals;
+    private NavGrouper                                              navGrouper             = new PathPrefixNavGrouper()
             .setNavGroupDefResolver(e -> viewNavGroupResolver.apply(e))
-            .setViewIconGenerator(e -> viewIconGenerator.apply(e));
+            .setViewIconGenerator(e -> viewIconGenerator.apply(e))
+            .setGroupIconGenerator(s -> viewGroupIconGenerator.apply(s));
     private ComponentRenderer<SideNavItem, NavNode>                 navNodeRenderer      = defaultNavNodeRenderer();
     private boolean navBuilt = false;
     private boolean navPopulated = false;
@@ -409,6 +411,17 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     /** Sets the icon generator for leaf nav items. Return {@code null} or a supplier returning {@code null} to show no icon. */
     protected void setViewIconGenerator(Function<MenuEntry, Supplier<Icon>> generator) {
         viewIconGenerator = generator;
+        repopulateNav();
+    }
+
+    /**
+     * Sets the icon generator for path-based group nav nodes. The key is the
+     * partial route path of the group (e.g. {@code "catalog"} or
+     * {@code "catalog/admin"}). Return {@code null} or a supplier returning
+     * {@code null} to show no icon. {@link NavGroup}-based groups are unaffected.
+     */
+    protected void setViewGroupIconGenerator(Function<String, Supplier<Icon>> generator) {
+        viewGroupIconGenerator = generator;
         repopulateNav();
     }
 
