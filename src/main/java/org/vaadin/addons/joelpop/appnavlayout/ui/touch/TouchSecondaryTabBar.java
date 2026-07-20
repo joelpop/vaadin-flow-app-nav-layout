@@ -35,6 +35,7 @@ import java.util.Map;
  */
 public class TouchSecondaryTabBar extends HorizontalLayout {
 
+    private final Signal<Location> navigationSignal;
     private NavGrouper navGrouper;
     private final Button backButton;
     private final Tabs tabs = new Tabs();
@@ -46,12 +47,14 @@ public class TouchSecondaryTabBar extends HorizontalLayout {
 
     /** Builds the component shell; call {@link #setNavGrouper} before attaching so content populates on first attach. */
     public TouchSecondaryTabBar(Signal<Location> navigationSignal) {
+        this.navigationSignal = navigationSignal;
 
         setWidthFull();
         setAlignItems(FlexComponent.Alignment.CENTER);
         setVisible(false);
         setPadding(false);
         setSpacing(false);
+        addClassName("secondary-tab-bar");
 
         backButton = new Button(VaadinIcon.ARROW_LEFT.create());
         backButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ICON);
@@ -67,6 +70,7 @@ public class TouchSecondaryTabBar extends HorizontalLayout {
     /** Assigns the grouper used to resolve group labels during {@code afterNavigation}. */
     public void setNavGrouper(NavGrouper navGrouper) {
         this.navGrouper = navGrouper;
+        rebuildForPath(navigationSignal.peek().getPath());
     }
 
     /**

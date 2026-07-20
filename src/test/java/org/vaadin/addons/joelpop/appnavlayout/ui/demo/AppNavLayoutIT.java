@@ -30,6 +30,13 @@ class AppNavLayoutIT {
     private static final int DESKTOP_WIDTH  = 1280;
     private static final int DESKTOP_HEIGHT = 800;
 
+    // Tablet: short side >= 768px triggers DeviceType.TABLET.
+    // Default selector: portrait → RAIL, landscape → SIDENAV.
+    private static final int TABLET_PORTRAIT_WIDTH   = 820;
+    private static final int TABLET_PORTRAIT_HEIGHT  = 1180;
+    private static final int TABLET_LANDSCAPE_WIDTH  = 1180;
+    private static final int TABLET_LANDSCAPE_HEIGHT = 820;
+
     private static final String BASE_URL = "http://localhost:8099";
 
     private static Playwright playwright;
@@ -74,6 +81,15 @@ class AppNavLayoutIT {
         context.close();
         context = browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(PHONE_WIDTH, PHONE_HEIGHT)
+                .setHasTouch(true));
+        page = context.newPage();
+        return page;
+    }
+
+    private Page newTabletPortraitPage() {
+        context.close();
+        context = browser.newContext(new Browser.NewContextOptions()
+                .setViewportSize(TABLET_PORTRAIT_WIDTH, TABLET_PORTRAIT_HEIGHT)
                 .setHasTouch(true));
         page = context.newPage();
         return page;
@@ -125,8 +141,8 @@ class AppNavLayoutIT {
         pauseForHumanIfHeaded();
 
         assertThat(page.locator("vaadin-side-nav")).isVisible();
-        // Three views — three SideNavItems.
-        assertThat(page.locator("vaadin-side-nav-item")).hasCount(3);
+        // Home, Catalog group (+ Products and Categories children), Orders = 5 items.
+        assertThat(page.locator("vaadin-side-nav-item")).hasCount(5);
     }
 
     @Test
@@ -139,6 +155,36 @@ class AppNavLayoutIT {
         page.navigate(BASE_URL + "/catalog");
         page.waitForLoadState(LoadState.NETWORKIDLE);
         assertThat(page.locator("text=Catalog view content")).isVisible();
+        pauseForHumanIfHeaded();
+    }
+
+    @Test
+    void secondaryNavVisibleOnTabletPortraitSubRoute() {
+        newTabletPortraitPage();
+        page.navigate(BASE_URL + "/catalog/products");
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+        pauseForHumanIfHeaded();
+
+        assertThat(page.locator(".secondary-tab-bar vaadin-tabs")).isVisible();
+    }
+
+    @Test
+    void secondaryNavSurvivesTabletOrientationChange() {
+        newTabletPortraitPage();
+        page.navigate(BASE_URL + "/catalog/products");
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+        assertThat(page.locator(".secondary-tab-bar vaadin-tabs")).isVisible();
+        pauseForHumanIfHeaded();
+
+        // Rotate to landscape — default selector switches to SIDENAV
+        page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
+        page.waitForTimeout(300);
+        pauseForHumanIfHeaded();
+
+        // Rotate back to portrait — RAIL rebuilds; secondary nav must reappear
+        page.setViewportSize(TABLET_PORTRAIT_WIDTH, TABLET_PORTRAIT_HEIGHT);
+        page.waitForTimeout(300);
+        assertThat(page.locator(".secondary-tab-bar vaadin-tabs")).isVisible();
         pauseForHumanIfHeaded();
     }
 
