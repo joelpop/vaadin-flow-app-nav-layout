@@ -24,6 +24,14 @@ public interface HasViewHeaderTitle {
         return null;
     }
 
+    /**
+     * Returns an icon for the view header, or {@code null} for no icon.
+     *
+     * <p><strong>Important:</strong> {@link Icon} is a live DOM component; each
+     * call to this method must return a <em>new</em> instance. Returning a cached
+     * {@code Icon} will cause it to be silently moved out of its current parent
+     * on each navigation event.
+     */
     default Icon getViewHeaderIcon() {
         return null;
     }

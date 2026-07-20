@@ -8,8 +8,7 @@ import com.vaadin.flow.component.Component;
  * each navigation and places the result in the {@code viewHeaderSlot} on both
  * desktop and mobile.
  *
- * <p>Return {@code null} to suppress the slot. {@link AdminBaseView} implements
- * this interface for the common case of a single action button.
+ * <p>Return {@code null} to suppress the slot.
  */
 public interface HasViewHeaderComponent {
 
