@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for AppNavLayout.
@@ -166,6 +167,30 @@ class AppNavLayoutIT {
         pauseForHumanIfHeaded();
 
         assertThat(page.locator(".secondary-tab-bar vaadin-tabs")).isVisible();
+    }
+
+    @Test
+    void drawerOverlaysContentAfterOrientationChange() {
+        newTabletPortraitPage();
+        page.navigate(BASE_URL + "/");
+        page.waitForLoadState(LoadState.NETWORKIDLE);
+
+        // Initial RAIL state: drawer must be in overlay mode (not push mode).
+        assertTrue((boolean) page.evaluate("() => document.querySelector('vaadin-app-layout').overlay"),
+                "drawer should be in overlay mode at portrait tablet");
+        pauseForHumanIfHeaded();
+
+        // Rotate to landscape — default selector switches to SIDENAV.
+        page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
+        page.waitForTimeout(300);
+
+        // Rotate back to portrait — RAIL rebuilds; overlay mode must be restored.
+        page.setViewportSize(TABLET_PORTRAIT_WIDTH, TABLET_PORTRAIT_HEIGHT);
+        page.waitForTimeout(300);
+
+        assertTrue((boolean) page.evaluate("() => document.querySelector('vaadin-app-layout').overlay"),
+                "drawer should remain in overlay mode after orientation change back to portrait");
+        pauseForHumanIfHeaded();
     }
 
     @Test

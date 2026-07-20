@@ -63,8 +63,21 @@ GLOBAL_STYLES.replaceSync(`
 `);
 document.adoptedStyleSheets = [...document.adoptedStyleSheets, GLOBAL_STYLES];
 
-// vaadin-app-layout reads --vaadin-app-layout-drawer-overlay in its own
-// connectedCallback(), which can fire before this module's stylesheet is
-// adopted. A synthetic resize forces it to re-evaluate now that the CSS above
-// (which sets that variable when [nav-rail] is present) is live.
-requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+// vaadin-app-layout evaluates --vaadin-app-layout-drawer-overlay inside its
+// window 'resize' handler (_resize → _updateOverlayMode). It does NOT watch
+// element-level resize — only window resize. So whenever nav-rail is added
+// (initial attach or orientation-driven rebuild), fire a synthetic window
+// resize so AppLayout re-evaluates the variable now that both the nav-rail
+// attribute and our CSS rule are live.
+new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+        if ((mutation.target as HTMLElement).hasAttribute('nav-rail')) {
+            requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+            break;
+        }
+    }
+}).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['nav-rail'],
+    subtree: true,
+});

@@ -208,6 +208,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             getStyle().remove("--vaadin-app-layout-touch-optimized");
             if (activeNavType == NavType.RAIL) {
                 getElement().removeAttribute("nav-rail");
+                getStyle().remove("--vaadin-app-layout-drawer-overlay");
                 getStyle().remove("--nav-rail-width");
                 getStyle().remove("padding-inline-start");
             }
@@ -247,6 +248,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
             if (activeNavType == NavType.RAIL) {
                 getElement().setAttribute("nav-rail", "");
+                getStyle().set("--vaadin-app-layout-drawer-overlay", "true");
                 getStyle().set("--nav-rail-width", "5rem");
                 getStyle().set("padding-inline-start", "var(--nav-rail-width)");
                 setDrawerOpened(false);
