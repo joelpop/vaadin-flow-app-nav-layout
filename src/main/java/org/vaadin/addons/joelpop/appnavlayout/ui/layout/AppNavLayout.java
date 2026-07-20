@@ -135,8 +135,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             .setNavGroupDefResolver(e -> viewNavGroupResolver.apply(e))
             .setViewIconGenerator(e -> viewIconGenerator.apply(e));
     private ComponentRenderer<SideNavItem, NavNode>                 navNodeRenderer      = defaultNavNodeRenderer();
-    private boolean navBuilt = false;
-    private boolean navPopulated = false;
+    private enum NavState { UNBUILT, BUILT, POPULATED }
+    private NavState navState = NavState.UNBUILT;
 
     protected AppNavLayout() {
         super.setPrimarySection(Section.DRAWER);
@@ -176,23 +176,18 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // ——————————— Nav-type switching ————————————
 
     private void applyNavType(NavType navType) {
-        if (navBuilt && navType == this.activeNavType) {
-            if (!navPopulated) {
-                populateNav();
-                rebuildViewHeader(currentViewSignal.peek());
-            }
+        if (navState == NavState.POPULATED && navType == this.activeNavType) {
             return;
         }
 
-        if (navBuilt) {
+        if (navState != NavState.UNBUILT) {
             tearDownNav();
-            navBuilt = false;
-            navPopulated = false;
+            navState = NavState.UNBUILT;
         }
 
         this.activeNavType = navType;
         buildNav();
-        navBuilt = true;
+        navState = NavState.BUILT;
         placeBrandAndUserContent();
         populateNav();
         rebuildViewHeader(currentViewSignal.peek());
@@ -284,7 +279,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void placeBrandAndUserContent() {
-        if (!navBuilt) {
+        if (navState == NavState.UNBUILT) {
             return;
         }
         if (activeNavType != NavType.SIDENAV) {
@@ -319,12 +314,12 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         else {
             populateSideNav();
         }
-        navPopulated = true;
+        navState = NavState.POPULATED;
     }
 
     private void repopulateNav() {
-        if (navPopulated) {
-            navPopulated = false;
+        if (navState == NavState.POPULATED) {
+            navState = NavState.BUILT;
             navGrouper.reset();
             populateNav();
         }
