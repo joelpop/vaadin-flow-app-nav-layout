@@ -323,7 +323,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private void repopulateNav() {
         if (navState == NavState.POPULATED) {
             navState = NavState.BUILT;
-            navGrouper.reset();
             populateNav();
         }
     }
@@ -417,6 +416,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      */
     protected void setViewNavGroupResolver(Function<MenuEntry, NavGroup> resolver) {
         viewNavGroupResolver = resolver;
+        navGrouper.reset();
         repopulateNav();
     }
 
