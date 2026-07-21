@@ -86,12 +86,11 @@ public class TouchSecondaryTabBar extends HorizontalLayout {
 
         var entries = MenuConfiguration.getMenuEntries();
 
-        var current = entries.stream()
-                .map(RouteNavUtils::normalizedPath)
-                .filter(path::equals)
+        var currentEntry = entries.stream()
+                .filter(e -> path.equals(RouteNavUtils.normalizedPath(e)))
                 .findFirst().orElse(null);
 
-        if (current == null) {
+        if (currentEntry == null) {
             setVisible(false);
             return;
         }
@@ -106,7 +105,7 @@ public class TouchSecondaryTabBar extends HorizontalLayout {
         currentRoot = segs.getFirst();
 
         if (segs.size() == 2) {
-            buildLevel1(entries, currentRoot, RouteNavUtils.routeSegmentLabel(segs.get(1)));
+            buildLevel1(entries, currentRoot, navGrouper.nodeFor(currentEntry).title());
         }
         else {
             buildLevel2(entries, segs, path);
