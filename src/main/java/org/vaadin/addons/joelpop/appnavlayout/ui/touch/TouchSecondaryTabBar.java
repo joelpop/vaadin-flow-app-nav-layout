@@ -146,7 +146,15 @@ public class TouchSecondaryTabBar extends HorizontalLayout {
                 .toList();
 
         if (siblings.isEmpty()) {
-            buildLevel1(entries, segs.getFirst(), currentParentLabel);
+            // Derive the active label the same way buildCanonicalBySegment would:
+            // use the navGrouper title for the entry at routeParentPrefix if one exists,
+            // otherwise humanise the second path segment.
+            var fallbackLabel = entries.stream()
+                    .filter(e -> routeParentPrefix.equals(RouteNavUtils.normalizedPath(e)))
+                    .findFirst()
+                    .map(e -> navGrouper.nodeFor(e).title())
+                    .orElseGet(() -> RouteNavUtils.routeSegmentLabel(segs.get(1)));
+            buildLevel1(entries, segs.getFirst(), fallbackLabel);
             return;
         }
 
