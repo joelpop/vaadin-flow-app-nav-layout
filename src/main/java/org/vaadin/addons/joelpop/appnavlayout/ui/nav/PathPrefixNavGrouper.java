@@ -66,7 +66,7 @@ public final class PathPrefixNavGrouper implements NavGrouper {
                 }
                 firstSegToDefRoot.putIfAbsent(segs.getFirst(), defGroupNode(rootDef));
             }
-            return NavNode.of(entry, defGroupNode(def));
+            return NavNode.of(entry, viewIconGenerator.apply(entry), defGroupNode(def));
         }
 
         var segs = RouteNavUtils.pathSegments(entry.path());
@@ -96,7 +96,7 @@ public final class PathPrefixNavGrouper implements NavGrouper {
         }
 
         var deepestParentPath = String.join("/", segs.subList(0, segs.size() - 1));
-        return NavNode.of(entry, cache.get(deepestParentPath));
+        return NavNode.of(entry, viewIconGenerator.apply(entry), cache.get(deepestParentPath));
     }
 
     private NavNode defGroupNode(NavGroup def) {

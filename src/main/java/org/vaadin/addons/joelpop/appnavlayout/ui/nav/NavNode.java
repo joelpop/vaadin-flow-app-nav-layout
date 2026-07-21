@@ -56,6 +56,11 @@ public final class NavNode {
         return new NavNode(RouteNavUtils.leafTitle(entry), menuIcon(entry), parent, entry);
     }
 
+    /** Leaf node nested under {@code parent}; uses {@code iconOverride} if non-null, else derives icon from {@code @Menu}. */
+    public static NavNode of(MenuEntry entry, Supplier<Icon> iconOverride, NavNode parent) {
+        return new NavNode(RouteNavUtils.leafTitle(entry), iconOverride != null ? iconOverride : menuIcon(entry), parent, entry);
+    }
+
     private static Supplier<Icon> menuIcon(MenuEntry entry) {
         var s = entry.icon();
         if (s == null || s.isEmpty()) return null;
