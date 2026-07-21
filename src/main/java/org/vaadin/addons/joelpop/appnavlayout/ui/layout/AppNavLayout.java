@@ -1,7 +1,5 @@
 package org.vaadin.addons.joelpop.appnavlayout.ui.layout;
 
-import org.vaadin.addons.joelpop.appnavlayout.ui.touch.TouchNavBar;
-import org.vaadin.addons.joelpop.appnavlayout.ui.touch.TouchSecondaryTabBar;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.DeviceType;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;

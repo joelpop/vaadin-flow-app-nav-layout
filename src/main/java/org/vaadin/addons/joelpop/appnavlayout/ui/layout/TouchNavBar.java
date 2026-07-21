@@ -1,4 +1,4 @@
-package org.vaadin.addons.joelpop.appnavlayout.ui.touch;
+package org.vaadin.addons.joelpop.appnavlayout.ui.layout;
 
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
@@ -47,7 +47,7 @@ import java.util.function.Supplier;
  * section has a direct navigable route at the root level it is used; otherwise the
  * lowest-order child is chosen automatically.
  */
-public class TouchNavBar extends FlexLayout {
+class TouchNavBar extends FlexLayout {
 
     // Practical minimum slot size for a labeled icon item (icon + label, comfortable tap area).
     // Material Design: 60–168dp; Apple HIG: ~64pt. Narrower than this, items become unreadable.

@@ -1,4 +1,4 @@
-package org.vaadin.addons.joelpop.appnavlayout.ui.touch;
+package org.vaadin.addons.joelpop.appnavlayout.ui.layout;
 
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -39,7 +39,7 @@ import java.util.List;
  * <p>Structural logic uses {@code @Route} template paths; {@code @Menu} titles are
  * display-only and do not affect depth or grouping.
  */
-public class TouchSecondaryTabBar extends HorizontalLayout {
+class TouchSecondaryTabBar extends HorizontalLayout {
 
     private final Signal<Location> navigationSignal;
     private NavGrouper navGrouper;
