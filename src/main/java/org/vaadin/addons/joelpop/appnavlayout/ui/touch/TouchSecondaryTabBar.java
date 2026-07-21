@@ -22,16 +22,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Recursive drill-down secondary tab bar. Shows the current depth's siblings
- * with a Back button when drilled below the first level. Tapping any tab
- * navigates to its canonical route; {@code afterNavigation} rebuilds the bar
- * entirely from the new URL depth.
+ * Two-level secondary tab bar for touch and rail navigation. It renders a
+ * horizontal {@link Tabs} row whose content adapts to the current URL depth:
  *
- * <p>Back is the only "no-navigation" special case: when the parent group has
- * no direct view, the bar reverts to the parent level without navigating.
+ * <ul>
+ *   <li><b>Level 1</b> (depth-2 routes, e.g. {@code orders/list}): shows flat sibling
+ *       tabs for all routes that share the same first path segment. No back button.
+ *   <li><b>Level 2</b> (depth-3+ routes, e.g. {@code catalog/detail/view}): shows a
+ *       {@code ←} back button and the sibling tabs under the two-segment parent prefix.
+ *       The back button returns to level 1 without navigating when no direct parent
+ *       route exists, or navigates to it when one does.
+ * </ul>
  *
- * <p>Structural logic (depth, grouping, prefix matching) uses the {@code @Route}
- * template path. {@code @Menu} titles are used only for display labels.
+ * <p>The bar hides itself ({@code setVisible(false)}) for top-level routes (depth &lt; 2)
+ * and for routes not present in {@link com.vaadin.flow.server.menu.MenuConfiguration}.
+ * The bar is hidden and inert until {@link #setNavGrouper} is called.
+ *
+ * <p>Structural logic uses {@code @Route} template paths; {@code @Menu} titles are
+ * display-only and do not affect depth or grouping.
  */
 public class TouchSecondaryTabBar extends HorizontalLayout {
 
@@ -67,7 +75,11 @@ public class TouchSecondaryTabBar extends HorizontalLayout {
         Signal.effect(this, () -> rebuildForPath(navigationSignal.get().getPath()));
     }
 
-    /** Assigns the grouper used to resolve group labels during {@code afterNavigation}. */
+    /**
+     * Sets the grouper used to derive tab labels and section membership. Must be
+     * called before the bar is useful; the bar remains hidden until this is set.
+     * Triggers an immediate rebuild for the current navigation path.
+     */
     public void setNavGrouper(NavGrouper navGrouper) {
         this.navGrouper = navGrouper;
         rebuildForPath(navigationSignal.peek().getPath());

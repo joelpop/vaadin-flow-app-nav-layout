@@ -41,6 +41,11 @@ import java.util.function.Supplier;
  * <p>Reacts to navigation via a {@link Signal}&lt;{@link Location}&gt; supplied at
  * construction; the active icon tracks the current route's root section as
  * determined by the {@link NavGrouper}.
+ *
+ * <p>Tapping a root-section icon navigates to the lowest-{@code @Menu.order} child
+ * route of that section (the first entry registered for that root node). When a
+ * section has a direct navigable route at the root level it is used; otherwise the
+ * lowest-order child is chosen automatically.
  */
 public class TouchNavBar extends FlexLayout {
 

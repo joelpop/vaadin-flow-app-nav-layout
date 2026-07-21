@@ -417,7 +417,17 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         repopulateNav();
     }
 
-    /** Overrides the nav grouping strategy. Default: {@link PathPrefixNavGrouper}. */
+    /**
+     * Overrides the nav grouping strategy. Default: {@link PathPrefixNavGrouper}.
+     *
+     * <p><strong>Important:</strong> replacing the grouper severs the automatic wiring
+     * that the default {@link PathPrefixNavGrouper} maintains to
+     * {@link #setViewNavGroupResolver} and {@link #setViewIconGenerator}. After this
+     * call, those two setters no longer influence grouping or leaf icons — they still
+     * update internal fields and trigger a nav repopulation, but the custom grouper
+     * is not consulted for those values. Configure the custom grouper directly before
+     * passing it here.
+     */
     protected void setNavGrouper(NavGrouper grouper) {
         navGrouper = grouper;
         repopulateNav();
@@ -445,7 +455,14 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         repopulateNav();
     }
 
-    /** Sets the title generator for leaf nav items. Return {@code null} to fall back to {@code @Menu#title()}. */
+    /**
+     * Sets the title generator for leaf nav items in the desktop {@link SideNav}.
+     * Return {@code null} to fall back to {@code @Menu#title()}.
+     *
+     * <p>Note: this generator applies to desktop {@link SideNavItem} labels only.
+     * Touch and rail nav item labels always use {@code NavNode.title()} (derived from
+     * {@code @Menu(title=...)}); this generator has no effect on those surfaces.
+     */
     protected void setViewTitleGenerator(Function<MenuEntry, String> generator) {
         viewTitleGenerator = generator;
         repopulateNav();
@@ -505,7 +522,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         return appTitle;
     }
 
-    /** Whether this session is using touch or rail nav (not desktop SideNav). */
+    /**
+     * Returns {@code true} if this session is using touch or rail nav (not desktop SideNav).
+     *
+     * <p>Returns {@code false} before the first {@link #onAttach(AttachEvent)} completes,
+     * because device detection requires a client round-trip. Do not call this from a
+     * subclass constructor.
+     */
     protected boolean isMobile() {
         return activeNavType != null && activeNavType != NavType.SIDENAV;
     }

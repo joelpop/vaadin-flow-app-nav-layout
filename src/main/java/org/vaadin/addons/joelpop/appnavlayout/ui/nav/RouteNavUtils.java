@@ -52,20 +52,6 @@ public final class RouteNavUtils {
     }
 
     /**
-     * Returns a human-readable label for the root section that owns this entry.
-     * For depth-1 routes (empty path, e.g. the root view) the {@code @Menu} title
-     * is used directly. For deeper routes the first URL segment is converted via
-     * {@link #routeSegmentLabel(String)}.
-     */
-    public static String rootPrefix(MenuEntry entry) {
-        var segs = pathSegments(entry.path());
-        if (segs.isEmpty() || segs.getFirst().isEmpty()) {
-            return entry.title() != null ? entry.title() : "";
-        }
-        return routeSegmentLabel(segs.getFirst());
-    }
-
-    /**
      * Returns the {@code @Menu} title as the leaf display name.
      * Falls back to the path when no title is present.
      */
