@@ -173,9 +173,17 @@ public class TouchNavBar extends FlexLayout {
                 LumoUtility.FlexDirection.COLUMN,
                 LumoUtility.AlignItems.CENTER,
                 LumoUtility.TextColor.SECONDARY);
+        item.getElement().setAttribute("tabindex", "0");
+        item.getElement().setAttribute("role", "button");
 
         if (path != null) {
             item.getElement().addEventListener("click", _ -> UI.getCurrent().navigate(path));
+            item.getElement().addEventListener("keydown", event -> {
+                var key = event.getEventData().path("event.key").asText();
+                if ("Enter".equals(key) || " ".equals(key)) {
+                    UI.getCurrent().navigate(path);
+                }
+            }).addEventData("event.key");
         }
         return item;
     }
