@@ -44,6 +44,15 @@ GLOBAL_STYLES.replaceSync(`
         z-index: 201;
     }
 
+    /* Reset native <button> defaults so touch-nav-item looks like the design. */
+    button.touch-nav-item {
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        font: inherit;
+    }
+
     /* Rail items: centered, with vertical padding for comfortable tap targets. */
     vaadin-app-layout[nav-rail] .touch-nav-item {
         padding-block: var(--lumo-space-s);

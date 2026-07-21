@@ -6,7 +6,7 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.nav.RouteNavUtils;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -52,7 +52,7 @@ public class TouchNavBar extends FlexLayout {
     private BiPredicate<String, String> pathMatcher = String::equals;
     private int maxIcons = 5;
     private NavNode overflowNode;
-    private final Map<NavNode, Div>    navItems        = new LinkedHashMap<>();
+    private final Map<NavNode, NativeButton> navItems        = new LinkedHashMap<>();
     private final Map<NavNode, Button> overflowButtons = new LinkedHashMap<>();
 
     /** Builds the bar shell in the given flex direction; call {@link #setNavGrouper} to populate items. */
@@ -159,36 +159,28 @@ public class TouchNavBar extends FlexLayout {
         return node;
     }
 
-    private static Div navItem(String title, Icon icon, String path) {
+    private static NativeButton navItem(String title, Icon icon, String path) {
         icon.setSize("20px");
 
         var titleSpan = new Span(title);
         titleSpan.addClassNames(LumoUtility.FontSize.XXSMALL, LumoUtility.FontWeight.BOLD,
                 LumoUtility.TextOverflow.ELLIPSIS);
 
-        var item = new Div();
+        var item = new NativeButton();
         item.add(icon, titleSpan);
         item.addClassNames("touch-nav-item",
                 LumoUtility.Display.FLEX,
                 LumoUtility.FlexDirection.COLUMN,
                 LumoUtility.AlignItems.CENTER,
                 LumoUtility.TextColor.SECONDARY);
-        item.getElement().setAttribute("tabindex", "0");
-        item.getElement().setAttribute("role", "button");
 
         if (path != null) {
-            item.getElement().addEventListener("click", _ -> UI.getCurrent().navigate(path));
-            item.getElement().addEventListener("keydown", event -> {
-                var key = event.getEventData().path("event.key").asText();
-                if ("Enter".equals(key) || " ".equals(key)) {
-                    UI.getCurrent().navigate(path);
-                }
-            }).addEventData("event.key");
+            item.addClickListener(_ -> UI.getCurrent().navigate(path));
         }
         return item;
     }
 
-    private Popover overflowPopover(List<MenuEntry> entries, Div target,
+    private Popover overflowPopover(List<MenuEntry> entries, NativeButton target,
                                      Map<NavNode, Button> overflowButtons) {
         var layout = new VerticalLayout();
         layout.setPadding(false);
