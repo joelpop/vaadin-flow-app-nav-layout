@@ -139,6 +139,11 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private enum NavState { UNBUILT, BUILT, POPULATED }
     private NavState navState = NavState.UNBUILT;
 
+    /**
+     * Creates an {@code AppNavLayout} with an empty app title and the
+     * {@link NavSelector#defaultSelector() default nav selector} (phone → touch,
+     * tablet-portrait → rail, tablet-landscape/desktop → sidenav).
+     */
     protected AppNavLayout() {
         super.setPrimarySection(Section.DRAWER);
 
@@ -164,11 +169,25 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         Signal.effect(this, () -> rebuildViewHeader(currentViewSignal.get()));
     }
 
+    /**
+     * Creates an {@code AppNavLayout} with the given app title and the
+     * {@link NavSelector#defaultSelector() default nav selector}.
+     *
+     * @param appTitle text displayed in the navigation bar; pass an empty string for no title
+     */
     protected AppNavLayout(String appTitle) {
         this();
         this.appTitle = appTitle;
     }
 
+    /**
+     * Creates an {@code AppNavLayout} with the given app title and nav selector.
+     *
+     * @param appTitle    text displayed in the navigation bar; pass an empty string for no title
+     * @param navSelector strategy that maps {@link DeviceType} and {@link Orientation} to a
+     *                    {@link NavType}; use {@link NavSelector#defaultSelector()} for the
+     *                    standard phone/tablet/desktop mapping
+     */
     protected AppNavLayout(String appTitle, NavSelector navSelector) {
         this(appTitle);
         this.navSelector = navSelector;
