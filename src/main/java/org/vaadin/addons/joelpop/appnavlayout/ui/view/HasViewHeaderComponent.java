@@ -12,5 +12,12 @@ import com.vaadin.flow.component.Component;
  */
 public interface HasViewHeaderComponent {
 
+    /**
+     * Returns the component to place in the view header slot, or {@code null} to suppress the slot.
+     *
+     * <p>Called on every navigation event. If this method returns a stateful component that is
+     * already attached elsewhere in the layout, return that same instance; otherwise return a
+     * new instance on each call.
+     */
     Component getViewHeaderComponent();
 }

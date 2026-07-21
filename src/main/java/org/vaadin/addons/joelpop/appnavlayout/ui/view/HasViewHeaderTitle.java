@@ -20,6 +20,12 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
  */
 public interface HasViewHeaderTitle {
 
+    /**
+     * Returns a component to append after the title (e.g. a badge or status chip),
+     * or {@code null} to omit the suffix slot.
+     *
+     * <p>Called on every navigation event; return a new instance on each call.
+     */
     default Component getViewHeaderSuffix() {
         return null;
     }
@@ -36,6 +42,14 @@ public interface HasViewHeaderTitle {
         return null;
     }
 
+    /**
+     * Returns the component to place in the view header title slot.
+     *
+     * <p>Called on every navigation event. The default implementation composes an icon (from
+     * {@link #getViewHeaderIcon()}), a heading (from {@link PageTitle}), and an optional suffix
+     * (from {@link #getViewHeaderSuffix()}) into a horizontal layout. Override to replace the
+     * entire title component. Return {@code null} to suppress the slot.
+     */
     default Component getViewHeaderTitle() {
         var viewClass = this.getClass();
         var icon      = getViewHeaderIcon();
