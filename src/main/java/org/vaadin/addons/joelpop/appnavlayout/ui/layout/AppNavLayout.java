@@ -131,6 +131,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private Function<MenuEntry, String>                             viewTitleGenerator     = m -> null;
     private Function<MenuEntry, NavGroup>                           viewNavGroupResolver   = m -> null;
     private BiPredicate<String, String>                             navPathMatcher         = String::equals;
+    private boolean                                                 navMatchNested         = false;
     private NavGrouper                                              navGrouper             = new PathPrefixNavGrouper()
             .setNavGroupDefResolver(e -> viewNavGroupResolver.apply(e))
             .setViewIconGenerator(e -> viewIconGenerator.apply(e));
@@ -372,11 +373,29 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     /**
      * Overrides the predicate used to determine whether the current navigation path
-     * belongs to a nav item's section. Applied consistently across all nav renderings.
-     * Default: {@link String#equals} (exact match).
+     * belongs to a nav item's section. Used by touch/rail nav to highlight the active
+     * icon. Default: {@link String#equals} (exact match).
+     *
+     * <p>Note: this predicate governs touch/rail active-item detection only. Desktop
+     * {@link SideNav} highlights items via Vaadin's own router matching, which is
+     * configured separately via {@link #setNavMatchNested}.
      */
     protected void setNavPathMatcher(BiPredicate<String, String> matcher) {
         navPathMatcher = matcher;
+        repopulateNav();
+    }
+
+    /**
+     * Controls whether desktop {@link SideNavItem}s use nested-route matching
+     * ({@link SideNavItem#setMatchNested(boolean)}), which causes a parent item to
+     * appear active whenever any of its child routes is current.
+     * Default: {@code false} (items highlight only on an exact route match).
+     *
+     * <p>Set to {@code true} when sub-routes should keep the parent nav item
+     * highlighted, for example when using a prefix-based path matcher.
+     */
+    protected void setNavMatchNested(boolean matchNested) {
+        navMatchNested = matchNested;
         repopulateNav();
     }
 
@@ -521,7 +540,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             var item = node.menuEntry()
                     .map(e -> {
                         var navItem = new SideNavItem(title, RouteNavUtils.normalizedPath(e));
-                        navItem.setMatchNested(navPathMatcher.test("a/b", "a"));
+                        navItem.setMatchNested(navMatchNested);
                         return navItem;
                     })
                     .orElseGet(() -> new SideNavItem(title));
