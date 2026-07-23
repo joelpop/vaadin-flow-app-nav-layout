@@ -24,10 +24,14 @@ GLOBAL_STYLES.replaceSync(`
         --vaadin-app-layout-drawer-overlay: true;
     }
 
-    /* Rail: pin navbar-bottom slot to the left edge, below the top bar. */
+    /* Rail: pin navbar-bottom slot to the full left edge, top to bottom.
+       Starting at 0 (not at navbar-offset-top) means the rail never jumps when
+       navigation changes the header height, and headroom-style header hiding does
+       not leave a gap above the rail. The companion ::part(navbar) rule below
+       keeps the fixed top bar out of the rail's x=0–5rem strip. */
     vaadin-app-layout[nav-rail]::part(navbar-bottom) {
         position: fixed !important;
-        inset-block-start: var(--vaadin-app-layout-navbar-offset-top, 3.5rem);
+        inset-block-start: 0;
         inset-block-end: 0;
         inset-inline-start: 0;
         width: var(--nav-rail-width, 5rem);
@@ -42,6 +46,14 @@ GLOBAL_STYLES.replaceSync(`
     /* Drawer slides over the rail when opened. */
     vaadin-app-layout[nav-rail]::part(drawer) {
         z-index: 201;
+    }
+
+    /* Both navbars carry "navbar" in their part list (part="navbar navbar-top" and
+       part="navbar navbar-bottom"), so ::part(navbar) would match both. Use the more
+       specific ::part(navbar-top) to target only the top bar. AppLayout's own
+       transition: inset-inline-start remains intact. */
+    vaadin-app-layout[nav-rail]::part(navbar-top) {
+        inset-inline-start: var(--nav-rail-width, 5rem);
     }
 
     /* Reset native <button> defaults so touch-nav-item looks like the design. */
