@@ -17,7 +17,6 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.dependency.JsModule;
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
@@ -102,7 +101,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     // Desktop nav components — non-null only in desktop mode
     private HorizontalLayout brandContainer;
-    private Span desktopSpacer;
     private HorizontalLayout userContainer;
     private SideNav sideNav;
 
@@ -235,11 +233,10 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             }
         }
         else {
-            topBar.remove(brandContainer, desktopSpacer, userContainer);
+            topBar.remove(brandContainer, userContainer);
             sideNav.getElement().removeFromParent();
             viewHeaderSlot.removeClassNames(LumoUtility.Border.BOTTOM, LumoUtility.BorderColor.CONTRAST_10);
             brandContainer = null;
-            desktopSpacer = null;
             userContainer = null;
             sideNav = null;
         }
@@ -285,14 +282,12 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             brandContainer.setPadding(false);
             brandContainer.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
 
-            desktopSpacer = new Span();
-            desktopSpacer.getStyle().set("flex", "1");
-
             userContainer = new HorizontalLayout();
             userContainer.setPadding(false);
             userContainer.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
 
-            topBar.add(brandContainer, desktopSpacer, userContainer);
+            topBar.add(brandContainer, userContainer);
+            topBar.expand(brandContainer);
 
             viewHeaderSlot.addClassNames(LumoUtility.Border.BOTTOM, LumoUtility.BorderColor.CONTRAST_10);
 
