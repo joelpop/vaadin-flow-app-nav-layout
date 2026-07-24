@@ -12,10 +12,10 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderComponent;
  * Not registered in @Menu, so it is routable but invisible in the nav bar —
  * used purely to exercise the HasViewHeaderComponent path in integration tests.
  */
-@Route("catalog/detail")
-class CatalogDetailView extends Div implements HasViewHeaderComponent {
+@Route(value = "catalog/detail", layout = DemoNavLayout.class)
+public class CatalogDetailView extends Div implements HasViewHeaderComponent {
 
-    CatalogDetailView() {
+    public CatalogDetailView() {
         add(new Paragraph("Catalog detail view content"));
     }
 
