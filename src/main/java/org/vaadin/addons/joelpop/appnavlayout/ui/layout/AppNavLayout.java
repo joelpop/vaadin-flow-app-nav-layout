@@ -150,12 +150,14 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         topBar.setPadding(false);
         topBar.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
         topBar.getStyle().set("min-height", "var(--lumo-size-xl)");
+        topBar.addClassName("app-top-bar");
         topBar.add(new DrawerToggle());
 
         viewHeaderSlot = new HorizontalLayout();
         viewHeaderSlot.setWidthFull();
         viewHeaderSlot.setPadding(true);
         viewHeaderSlot.setAlignItems(FlexComponent.Alignment.CENTER);
+        viewHeaderSlot.addClassName("view-header-slot");
         viewHeaderSlot.setVisible(false);
 
         var topBlock = new VerticalLayout();
