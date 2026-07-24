@@ -19,6 +19,12 @@
 
 const GLOBAL_STYLES = new CSSStyleSheet();
 GLOBAL_STYLES.replaceSync(`
+    /* Ensure the layout always fills the viewport so position:fixed elements anchor
+       correctly in iOS PWA mode regardless of whether the html/body height chain is set. */
+    vaadin-app-layout {
+        min-height: 100dvh;
+    }
+
     /* Force overlay drawer mode on rail devices (portrait tablet exceeds the 800px media query). */
     vaadin-app-layout[nav-rail] {
         --vaadin-app-layout-drawer-overlay: true;
