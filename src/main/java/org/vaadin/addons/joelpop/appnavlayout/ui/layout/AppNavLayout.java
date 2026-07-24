@@ -149,6 +149,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         topBar.setWidthFull();
         topBar.setPadding(false);
         topBar.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+        topBar.getStyle().set("min-height", "var(--lumo-size-xl)");
         topBar.add(new DrawerToggle());
 
         viewHeaderSlot = new HorizontalLayout();
