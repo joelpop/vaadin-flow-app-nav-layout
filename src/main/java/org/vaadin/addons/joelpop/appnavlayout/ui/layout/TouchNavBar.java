@@ -3,6 +3,7 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.layout;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.RouteNavUtils;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.html.Span;
@@ -116,7 +117,7 @@ class TouchNavBar extends FlexLayout {
             var rep = e.getValue();
             var item = navItem(rootNode.title(),
                                rootNode.createIcon().orElse(VaadinIcon.CIRCLE.create()),
-                               RouteNavUtils.normalizedPath(rep));
+                               rep.menuClass());
             navItems.put(rootNode, item);
             add(item);
         }
@@ -161,7 +162,7 @@ class TouchNavBar extends FlexLayout {
         return node;
     }
 
-    private static NativeButton navItem(String title, Icon icon, String path) {
+    private static NativeButton navItem(String title, Icon icon, Class<? extends Component> viewClass) {
         icon.setSize("20px");
 
         var titleSpan = new Span(title);
@@ -176,8 +177,8 @@ class TouchNavBar extends FlexLayout {
                 LumoUtility.AlignItems.CENTER,
                 LumoUtility.TextColor.SECONDARY);
 
-        if (path != null) {
-            item.addClickListener(_ -> UI.getCurrent().navigate(path));
+        if (viewClass != null) {
+            item.addClickListener(_ -> UI.getCurrent().navigate(viewClass));
         }
         return item;
     }
@@ -206,7 +207,7 @@ class TouchNavBar extends FlexLayout {
                     LumoUtility.Padding.Vertical.SMALL);
             btn.setWidthFull();
             btn.addClickListener(_ -> {
-                UI.getCurrent().navigate(RouteNavUtils.normalizedPath(entry));
+                UI.getCurrent().navigate(entry.menuClass());
                 popover.close();
             });
             overflowButtons.put(rootNode, btn);

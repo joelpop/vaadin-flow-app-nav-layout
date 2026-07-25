@@ -1,5 +1,6 @@
 package org.vaadin.addons.joelpop.appnavlayout.ui.layout;
 
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -16,8 +17,10 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.RouteNavUtils;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Two-level secondary tab bar for touch and rail navigation. It renders a
@@ -45,10 +48,11 @@ class TouchSecondaryTabBar extends HorizontalLayout {
     private NavGrouper navGrouper;
     private final Button backButton;
     private final Tabs tabs = new Tabs();
+    private final Map<Tab, Class<? extends Component>> tabPaths = new HashMap<>();
 
     private String currentRoot;
     private String currentParentLabel;
-    private String currentParentRoute;
+    private Class<? extends Component> currentParentRoute;
 
     /** Builds the component shell; call {@link #setNavGrouper} before attaching so content populates on first attach. */
     public TouchSecondaryTabBar(Signal<Location> navigationSignal) {
@@ -67,6 +71,14 @@ class TouchSecondaryTabBar extends HorizontalLayout {
         backButton.addClickListener(_ -> handleBack());
 
         tabs.setWidthFull();
+        tabs.addSelectedChangeListener(event -> {
+            if (event.isFromClient()) {
+                var viewClass = tabPaths.get(event.getSelectedTab());
+                if (viewClass != null) {
+                    UI.getCurrent().navigate(viewClass);
+                }
+            }
+        });
 
         add(backButton, tabs);
         Signal.effect(this, () -> rebuildForPath(navigationSignal.get().getPath()));
@@ -144,7 +156,7 @@ class TouchSecondaryTabBar extends HorizontalLayout {
         currentParentRoute = entries.stream()
                 .filter(e -> RouteNavUtils.normalizedPath(e).equals(routeParentPrefix))
                 .findFirst()
-                .map(RouteNavUtils::normalizedPath)
+                .map(MenuEntry::menuClass)
                 .orElse(null);
 
         var siblings = entries.stream()
@@ -201,11 +213,11 @@ class TouchSecondaryTabBar extends HorizontalLayout {
 
     private void rebuildTabs(LinkedHashMap<String, MenuEntry> canonical, String activeLabel) {
         tabs.removeAll();
+        tabPaths.clear();
         Tab activeTab = null;
         for (var entry : canonical.entrySet()) {
             var tab = new Tab(entry.getKey());
-            var navPath = RouteNavUtils.normalizedPath(entry.getValue());
-            tab.getElement().addEventListener("click", _ -> UI.getCurrent().navigate(navPath));
+            tabPaths.put(tab, entry.getValue().menuClass());
             tabs.add(tab);
             if (entry.getKey().equals(activeLabel)) {
                 activeTab = tab;
