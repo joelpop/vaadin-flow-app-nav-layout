@@ -64,7 +64,7 @@ class TouchNavBar extends FlexLayout {
             setSizeFull();
             setJustifyContentMode(FlexComponent.JustifyContentMode.START);
             setAlignItems(FlexComponent.Alignment.CENTER);
-            getStyle().set("gap", "var(--lumo-space-m)");
+            addClassName(LumoUtility.Gap.MEDIUM);
         }
         else {
             setWidthFull();
