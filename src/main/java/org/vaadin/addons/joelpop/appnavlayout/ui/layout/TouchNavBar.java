@@ -4,8 +4,6 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.RouteNavUtils;
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -16,7 +14,6 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.page.Page;
 import com.vaadin.flow.component.popover.Popover;
 import com.vaadin.flow.component.popover.PopoverVariant;
-import com.vaadin.flow.dom.Style;
 import com.vaadin.flow.router.Location;
 import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
@@ -58,7 +55,7 @@ class TouchNavBar extends FlexLayout {
     private int maxIcons = 5;
     private NavNode overflowNode;
     private final Map<NavNode, NativeButton> navItems        = new LinkedHashMap<>();
-    private final Map<NavNode, Button> overflowButtons = new LinkedHashMap<>();
+    private final Map<NavNode, NativeButton> overflowButtons = new LinkedHashMap<>();
 
     /** Builds the bar shell in the given flex direction; call {@link #setNavGrouper} to populate items. */
     public TouchNavBar(Signal<Location> navigationSignal, Page page, FlexDirection direction) {
@@ -186,7 +183,7 @@ class TouchNavBar extends FlexLayout {
     }
 
     private Popover overflowPopover(List<MenuEntry> entries, NativeButton target,
-                                     Map<NavNode, Button> overflowButtons) {
+                                     Map<NavNode, NativeButton> overflowButtons) {
         var layout = new VerticalLayout();
         layout.setPadding(false);
         layout.setSpacing(false);
@@ -196,15 +193,22 @@ class TouchNavBar extends FlexLayout {
         popover.setTarget(target);
         for (var entry : entries) {
             var rootNode = rootNodeFor(entry);
-            var btn = new Button(rootNode.title(),
-                                 rootNode.createIcon().orElse(VaadinIcon.CIRCLE.create()), _ -> {
+            var icon = rootNode.createIcon().orElse(VaadinIcon.CIRCLE.create());
+            icon.setSize("20px");
+
+            var btn = new NativeButton();
+            btn.add(icon, new Span(rootNode.title()));
+            btn.addClassNames("overflow-nav-item",
+                    LumoUtility.Display.FLEX,
+                    LumoUtility.AlignItems.CENTER,
+                    LumoUtility.Gap.SMALL,
+                    LumoUtility.Padding.Horizontal.MEDIUM,
+                    LumoUtility.Padding.Vertical.SMALL);
+            btn.setWidthFull();
+            btn.addClickListener(_ -> {
                 UI.getCurrent().navigate(RouteNavUtils.normalizedPath(entry));
                 popover.close();
             });
-            btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-            btn.addClassName("overflow-nav-item");
-            btn.setWidthFull();
-            btn.getStyle().setJustifyContent(Style.JustifyContent.FLEX_START);
             overflowButtons.put(rootNode, btn);
             layout.add(btn);
         }

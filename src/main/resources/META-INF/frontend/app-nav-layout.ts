@@ -62,13 +62,15 @@ GLOBAL_STYLES.replaceSync(`
         inset-inline-start: var(--nav-rail-width, 5rem);
     }
 
-    /* Reset native <button> defaults so touch-nav-item looks like the design. */
-    button.touch-nav-item {
+    /* Reset native <button> defaults so touch-nav-item / overflow-nav-item look like the design. */
+    button.touch-nav-item,
+    button.overflow-nav-item {
         background: none;
         border: none;
         padding: 0;
         cursor: pointer;
         font: inherit;
+        text-align: start;
     }
 
     /* Rail items: centered, with vertical padding for comfortable tap targets. */
@@ -76,16 +78,19 @@ GLOBAL_STYLES.replaceSync(`
         padding-block: var(--lumo-space-s);
     }
 
-    /* Active state for touch/rail nav items. */
-    .touch-nav-item.active {
+    /* Active state for touch/rail/overflow nav items. */
+    .touch-nav-item.active,
+    .overflow-nav-item.active {
         color: var(--lumo-primary-color);
     }
 
-    /* Overflow popover buttons: secondary by default, primary when active.
-       ::part(label/prefix) reaches into vaadin-button's shadow DOM. */
-    vaadin-button.overflow-nav-item:not(.active)::part(label),
-    vaadin-button.overflow-nav-item:not(.active)::part(prefix) {
+    /* Overflow popover buttons: secondary by default, primary when active. */
+    .overflow-nav-item:not(.active) {
         color: var(--lumo-secondary-text-color);
+    }
+
+    .overflow-nav-item:hover {
+        background: var(--lumo-contrast-5pct);
     }
 `);
 document.adoptedStyleSheets = [...document.adoptedStyleSheets, GLOBAL_STYLES];
