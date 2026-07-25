@@ -107,6 +107,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // Touch/rail nav components — non-null only in touch or rail mode
     private VerticalLayout brandDrawerSlot;
     private VerticalLayout userDrawerSlot;
+    private VerticalLayout drawerContent;
     private TouchSecondaryTabBar touchSecondaryTabBar;
     private TouchNavBar touchNavBar;
     private NavType activeNavType;
@@ -218,12 +219,12 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         if (activeNavType != NavType.SIDENAV) {
             topBar.remove(touchSecondaryTabBar);
             touchNavBar.getElement().removeFromParent();
-            brandDrawerSlot.getElement().removeFromParent();
-            userDrawerSlot.getElement().removeFromParent();
+            drawerContent.getElement().removeFromParent();
             touchSecondaryTabBar = null;
             touchNavBar = null;
             brandDrawerSlot = null;
             userDrawerSlot = null;
+            drawerContent = null;
             getStyle().remove("--vaadin-app-layout-touch-optimized");
             if (activeNavType == NavType.RAIL) {
                 getElement().removeAttribute("nav-rail");
@@ -256,7 +257,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             userDrawerSlot = new VerticalLayout();
             userDrawerSlot.setPadding(false);
             userDrawerSlot.setSpacing(false);
-            userDrawerSlot.getStyle().setMarginTop("auto");
+
+            drawerContent = new VerticalLayout();
+            drawerContent.setPadding(false);
+            drawerContent.setSpacing(false);
+            drawerContent.setSizeFull();
+            drawerContent.add(brandDrawerSlot, userDrawerSlot);
+            drawerContent.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
 
             var page = UI.getCurrent().getPage();
             var direction = activeNavType == NavType.RAIL
@@ -274,7 +281,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
             // touch-optimized ensures the navbar-bottom slot is rendered by AppLayout
             getStyle().set("--vaadin-app-layout-touch-optimized", "true");
-            super.addToDrawer(brandDrawerSlot, userDrawerSlot);
+            super.addToDrawer(drawerContent);
             super.addToNavbar(true, touchNavBar);
         }
         else {
