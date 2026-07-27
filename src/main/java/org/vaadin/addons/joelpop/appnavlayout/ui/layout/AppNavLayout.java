@@ -13,13 +13,11 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderComponent;
 import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderTitle;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
-import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.page.ExtendedClientDetails;
@@ -33,11 +31,9 @@ import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.signals.Signal;
 import com.vaadin.flow.signals.local.ValueSignal;
-import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiPredicate;
@@ -96,29 +92,19 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private DeviceType deviceType;
 
     // Always-present layout containers
-    private final HorizontalLayout topBar;
-    private final HorizontalLayout viewHeaderSlot;
+    final HorizontalLayout topBar;
+    final HorizontalLayout viewHeaderSlot;
 
-    // Desktop nav components — non-null only in desktop mode
-    private HorizontalLayout brandContainer;
-    private HorizontalLayout userContainer;
-    private SideNav sideNav;
-
-    // Touch/rail nav components — non-null only in touch or rail mode
-    private VerticalLayout brandDrawerSlot;
-    private VerticalLayout userDrawerSlot;
-    private VerticalLayout drawerContent;
-    private TouchSecondaryTabBar touchSecondaryTabBar;
-    private TouchNavBar touchNavBar;
     private NavType activeNavType;
+    private NavStrategy activeStrategy;
 
     // Buffered brand/user content — survives nav-type switches
-    private final List<Component> bufferedBrandContent = new ArrayList<>();
-    private Component bufferedUserMenu;
+    final List<Component> bufferedBrandContent = new ArrayList<>();
+    Component bufferedUserMenu;
 
     // Holds the Location of the most recent completed navigation; updated in afterNavigation().
     // In Vaadin 25.2 this will be replaced by UI.routerStateSignal().map(RouterState::location).
-    private final ValueSignal<Location> navigationSignal = new ValueSignal<>(new Location(""));
+    final ValueSignal<Location> navigationSignal = new ValueSignal<>(new Location(""));
 
     // Holds the active view component after each completed navigation; drives the view header slot.
     // In Vaadin 25.2 this will be replaced by UI.routerStateSignal().map(RouterState::currentView).
@@ -127,12 +113,12 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private Function<MenuEntry, Supplier<Icon>>                     viewIconGenerator      = m -> null;
     private Function<MenuEntry, String>                             viewTitleGenerator     = m -> null;
     private Function<MenuEntry, NavGroup>                           viewNavGroupResolver   = m -> null;
-    private BiPredicate<String, String>                             navPathMatcher         = String::equals;
+    BiPredicate<String, String>                                     navPathMatcher         = String::equals;
     private boolean                                                 navMatchNested         = false;
-    private NavGrouper                                              navGrouper             = new PathPrefixNavGrouper()
+    NavGrouper                                                      navGrouper             = new PathPrefixNavGrouper()
             .setNavGroupDefResolver(e -> viewNavGroupResolver.apply(e))
             .setViewIconGenerator(e -> viewIconGenerator.apply(e));
-    private ComponentRenderer<SideNavItem, NavNode>                 navNodeRenderer      = defaultNavNodeRenderer();
+    ComponentRenderer<SideNavItem, NavNode>                         navNodeRenderer      = defaultNavNodeRenderer();
     private enum NavState { UNBUILT, BUILT, POPULATED }
     private NavState navState = NavState.UNBUILT;
 
@@ -206,6 +192,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         }
 
         this.activeNavType = navType;
+        activeStrategy = (navType == NavType.SIDENAV)
+                ? new DesktopNavStrategy(this)
+                : new TouchNavStrategy(this, navType == NavType.RAIL);
         buildNav();
         navState = NavState.BUILT;
         placeBrandAndUserContent();
@@ -216,113 +205,19 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void tearDownNav() {
-        if (activeNavType != NavType.SIDENAV) {
-            topBar.remove(touchSecondaryTabBar);
-            touchNavBar.getElement().removeFromParent();
-            drawerContent.getElement().removeFromParent();
-            touchSecondaryTabBar = null;
-            touchNavBar = null;
-            brandDrawerSlot = null;
-            userDrawerSlot = null;
-            drawerContent = null;
-            getStyle().remove("--vaadin-app-layout-touch-optimized");
-            if (activeNavType == NavType.RAIL) {
-                getElement().removeAttribute("nav-rail");
-                getStyle().remove("--vaadin-app-layout-drawer-overlay");
-                getStyle().remove("--nav-rail-width");
-                getStyle().remove("padding-inline-start");
-            }
-        }
-        else {
-            topBar.remove(brandContainer, userContainer);
-            sideNav.getElement().removeFromParent();
-            viewHeaderSlot.removeClassNames(LumoUtility.Border.BOTTOM, LumoUtility.BorderColor.CONTRAST_10);
-            brandContainer = null;
-            userContainer = null;
-            sideNav = null;
-        }
+        activeStrategy.tearDown();
+        activeStrategy = null;
     }
 
     private void buildNav() {
-        if (activeNavType != NavType.SIDENAV) {
-            touchSecondaryTabBar = new TouchSecondaryTabBar(navigationSignal);
-            touchSecondaryTabBar.getStyle().set("min-width", "0");
-            topBar.add(touchSecondaryTabBar);
-            topBar.expand(touchSecondaryTabBar);
-
-            brandDrawerSlot = new VerticalLayout();
-            brandDrawerSlot.setPadding(false);
-            brandDrawerSlot.setSpacing(false);
-
-            userDrawerSlot = new VerticalLayout();
-            userDrawerSlot.setPadding(false);
-            userDrawerSlot.setSpacing(false);
-
-            drawerContent = new VerticalLayout();
-            drawerContent.setPadding(false);
-            drawerContent.setSpacing(false);
-            drawerContent.setSizeFull();
-            drawerContent.add(brandDrawerSlot, userDrawerSlot);
-            drawerContent.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-
-            var page = UI.getCurrent().getPage();
-            var direction = activeNavType == NavType.RAIL
-                    ? FlexLayout.FlexDirection.COLUMN
-                    : FlexLayout.FlexDirection.ROW;
-            touchNavBar = new TouchNavBar(navigationSignal, page, direction);
-
-            if (activeNavType == NavType.RAIL) {
-                getElement().setAttribute("nav-rail", "");
-                getStyle().set("--vaadin-app-layout-drawer-overlay", "true");
-                getStyle().set("--nav-rail-width", "5rem");
-                getStyle().set("padding-inline-start", "var(--nav-rail-width)");
-                setDrawerOpened(false);
-            }
-
-            // touch-optimized ensures the navbar-bottom slot is rendered by AppLayout
-            getStyle().set("--vaadin-app-layout-touch-optimized", "true");
-            super.addToDrawer(drawerContent);
-            super.addToNavbar(true, touchNavBar);
-        }
-        else {
-            brandContainer = new HorizontalLayout();
-            brandContainer.setPadding(false);
-            brandContainer.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
-
-            userContainer = new HorizontalLayout();
-            userContainer.setPadding(false);
-            userContainer.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
-
-            topBar.add(brandContainer, userContainer);
-            topBar.expand(brandContainer);
-
-            viewHeaderSlot.addClassNames(LumoUtility.Border.BOTTOM, LumoUtility.BorderColor.CONTRAST_10);
-
-            sideNav = new SideNav();
-            super.addToDrawer(sideNav);
-        }
+        activeStrategy.build();
     }
 
     private void placeBrandAndUserContent() {
         if (navState == NavState.UNBUILT) {
             return;
         }
-        if (activeNavType != NavType.SIDENAV) {
-            brandDrawerSlot.removeAll();
-            bufferedBrandContent.forEach(brandDrawerSlot::add);
-            userDrawerSlot.removeAll();
-            if (bufferedUserMenu != null) {
-                userDrawerSlot.add(bufferedUserMenu);
-            }
-        }
-        else {
-            brandContainer.removeAll();
-            bufferedBrandContent.forEach(brandContainer::add);
-            userContainer.removeAll();
-            if (bufferedUserMenu != null) {
-                userContainer.add(bufferedUserMenu);
-            }
-        }
+        activeStrategy.placeBrandAndUserContent();
     }
 
     private void populateNav() {
@@ -331,14 +226,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
                 .filter(e -> viewNavGroupResolver.apply(e) != null)
                 .forEach(navGrouper::nodeFor);
 
-        if (activeNavType != NavType.SIDENAV) {
-            touchNavBar.setPathMatcher(navPathMatcher);
-            touchSecondaryTabBar.setNavGrouper(navGrouper);
-            touchNavBar.setNavGrouper(navGrouper);
-        }
-        else {
-            populateSideNav();
-        }
+        activeStrategy.populate();
         navState = NavState.POPULATED;
     }
 
@@ -487,27 +375,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void rebuildViewHeader(Component view) {
-        var titleComponent = (view instanceof HasViewHeaderTitle h) ? h.getViewHeaderTitle() : null;
-        var actionComponent = (view instanceof HasViewHeaderComponent h) ? h.getViewHeaderComponent() : null;
-
+        if (activeStrategy == null) {
+            // Fires once at construction via the Signal.effect below, before the first
+            // applyNavType() runs; viewHeaderSlot is already empty/invisible at that point.
+            return;
+        }
         viewHeaderSlot.removeAll();
-
-        if (activeNavType != NavType.SIDENAV) {
-            viewHeaderSlot.setVisible(actionComponent != null);
-            if (actionComponent != null) {
-                viewHeaderSlot.add(actionComponent);
-            }
-        }
-        else {
-            var hasContent = titleComponent != null || actionComponent != null;
-            viewHeaderSlot.setVisible(hasContent);
-            if (titleComponent != null) {
-                viewHeaderSlot.add(titleComponent);
-            }
-            if (actionComponent != null) {
-                viewHeaderSlot.add(actionComponent);
-            }
-        }
+        activeStrategy.rebuildViewHeader(view);
     }
 
     // ——————————— Protected hooks ————————————
@@ -542,39 +416,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     @Override
     public void addToNavbar(Component... components) {
         topBar.add(components);
-    }
-
-    // ——————————— Desktop nav ————————————
-
-    private void populateSideNav() {
-        sideNav.removeAll();
-        var sideNavItems = new LinkedHashMap<NavNode, SideNavItem>();
-
-        MenuConfiguration.getMenuEntries().forEach(entry -> {
-            var node = navGrouper.nodeFor(entry);
-            ensureAncestors(node, sideNavItems, navNodeRenderer);
-            var item = navNodeRenderer.createComponent(node);
-            sideNavItems.put(node, item);
-            node.parent()
-                    .ifPresentOrElse(
-                            parent -> sideNavItems.get(parent).addItem(item),
-                            () -> sideNav.addItem(item));
-        });
-    }
-
-    private void ensureAncestors(NavNode node, LinkedHashMap<NavNode, SideNavItem> sideNavItems,
-                                  ComponentRenderer<SideNavItem, NavNode> renderer) {
-        node.parent().ifPresent(parent -> {
-            if (!sideNavItems.containsKey(parent)) {
-                ensureAncestors(parent, sideNavItems, renderer);
-                var item = renderer.createComponent(parent);
-                sideNavItems.put(parent, item);
-                parent.parent()
-                        .ifPresentOrElse(
-                                grandparent -> sideNavItems.get(grandparent).addItem(item),
-                                () -> sideNav.addItem(item));
-            }
-        });
     }
 
     private ComponentRenderer<SideNavItem, NavNode> defaultNavNodeRenderer() {
