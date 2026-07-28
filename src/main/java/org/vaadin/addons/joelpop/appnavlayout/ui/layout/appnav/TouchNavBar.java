@@ -178,7 +178,7 @@ class TouchNavBar extends FlexLayout {
                 LumoUtility.TextColor.SECONDARY);
 
         if (viewClass != null) {
-            item.addClickListener(_ -> UI.getCurrent().navigate(viewClass));
+            item.addClickListener(unused -> UI.getCurrent().navigate(viewClass));
         }
         return item;
     }
@@ -206,7 +206,7 @@ class TouchNavBar extends FlexLayout {
                     LumoUtility.Padding.Horizontal.MEDIUM,
                     LumoUtility.Padding.Vertical.SMALL);
             btn.setWidthFull();
-            btn.addClickListener(_ -> {
+            btn.addClickListener(unused -> {
                 UI.getCurrent().navigate(entry.menuClass());
                 popover.close();
             });

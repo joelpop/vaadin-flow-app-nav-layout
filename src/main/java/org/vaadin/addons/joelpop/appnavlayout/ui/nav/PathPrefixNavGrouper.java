@@ -79,7 +79,7 @@ public final class PathPrefixNavGrouper implements NavGrouper {
             int idx = i;
             var partialPath = String.join("/", segs.subList(0, i + 1));
             var parentPath = i > 0 ? String.join("/", segs.subList(0, i)) : null;
-            cache.computeIfAbsent(partialPath, _ -> {
+            cache.computeIfAbsent(partialPath, unused -> {
                 if (idx == 0) {
                     var defRoot = firstSegToDefRoot.get(segs.getFirst());
                     if (defRoot != null) {

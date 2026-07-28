@@ -68,7 +68,7 @@ class TouchSecondaryTabBar extends HorizontalLayout {
         backButton = new Button(VaadinIcon.ARROW_LEFT.create());
         backButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ICON);
         backButton.setVisible(false);
-        backButton.addClickListener(_ -> handleBack());
+        backButton.addClickListener(unused -> handleBack());
 
         tabs.setWidthFull();
         tabs.addSelectedChangeListener(event -> {
