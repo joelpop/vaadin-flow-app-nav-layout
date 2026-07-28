@@ -1,4 +1,4 @@
-package org.vaadin.addons.joelpop.appnavlayout.ui.layout;
+package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
 import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderComponent;
 import com.vaadin.flow.component.Component;

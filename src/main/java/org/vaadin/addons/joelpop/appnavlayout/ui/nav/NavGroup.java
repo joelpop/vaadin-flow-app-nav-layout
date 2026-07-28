@@ -10,7 +10,7 @@ import java.util.function.Supplier;
  *
  * <p>Implement this interface on an annotation or enum to declare explicit group
  * metadata. Pass a resolver via
- * {@link org.vaadin.addons.joelpop.appnavlayout.ui.layout.AppNavLayout#setViewNavGroupResolver}
+ * {@link org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav.AppNavLayout#setViewNavGroupResolver}
  * so the framework can map each view to its group.
  */
 public interface NavGroup {
