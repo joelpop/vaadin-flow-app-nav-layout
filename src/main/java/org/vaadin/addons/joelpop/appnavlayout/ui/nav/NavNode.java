@@ -61,6 +61,12 @@ public final class NavNode {
         return new NavNode(RouteNavUtils.leafTitle(entry), iconOverride != null ? iconOverride : menuIcon(entry), parent, entry);
     }
 
+    /**
+     * Parses {@code @Menu(icon="...")} into an icon supplier. Expects the format
+     * {@code "collection:name"} (e.g. {@code "vaadin:home"}, matching {@link Icon}'s own
+     * collection/name constructor split on the first {@code ":"}). Returns {@code null} if
+     * {@code entry.icon()} is null/empty, or if it doesn't contain a {@code ":"} separator.
+     */
     private static Supplier<Icon> menuIcon(MenuEntry entry) {
         var s = entry.icon();
         if (s == null || s.isEmpty()) return null;

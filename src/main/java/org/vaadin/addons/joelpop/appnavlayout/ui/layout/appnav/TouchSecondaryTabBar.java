@@ -201,6 +201,9 @@ class TouchSecondaryTabBar extends HorizontalLayout {
     // ——————————— Back ————————————
 
     private void handleBack() {
+        // currentRoot/currentParentRoute are only null until segs.size() >= 2 first populates
+        // them in buildLevel2(); handleBack() is only reachable via the back button, which is
+        // only visible in that same level-2 state, so both are guaranteed non-null here.
         if (currentParentRoute != null) {
             UI.getCurrent().navigate(currentParentRoute);
         }

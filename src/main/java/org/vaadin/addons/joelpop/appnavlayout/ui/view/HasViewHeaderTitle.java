@@ -10,8 +10,9 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 
 /**
  * Implemented by views that want an auto-generated icon+title component in the
- * adaptive view header slot. {@link AppNavLayout} checks for this interface on
- * each navigation and places the result in the {@code viewHeaderSlot} (desktop only).
+ * adaptive view header slot.
+ * {@link org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav.AppNavLayout} checks for this
+ * interface on each navigation and places the result in the {@code viewHeaderSlot} (desktop only).
  *
  * <p>The default implementation calls {@link #getViewHeaderIcon()} and reads {@link PageTitle}
  * from the view class, then appends {@link #getViewHeaderSuffix()} if non-null.

@@ -120,11 +120,27 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private Function<MenuEntry, NavGroup>                           viewNavGroupResolver   = m -> null;
     BiPredicate<String, String>                                     navPathMatcher         = String::equals;
     private boolean                                                 navMatchNested         = false;
+    // The lambdas forward to the mutable viewNavGroupResolver/viewIconGenerator fields above
+    // rather than closing over their initial (no-op) values, so setViewNavGroupResolver()/
+    // setViewIconGenerator() affect this already-created grouper without needing to rebuild it.
     NavGrouper                                                      navGrouper             = new PathPrefixNavGrouper()
             .setNavGroupDefResolver(e -> viewNavGroupResolver.apply(e))
             .setViewIconGenerator(e -> viewIconGenerator.apply(e));
     ComponentRenderer<SideNavItem, NavNode>                         navNodeRenderer      = defaultNavNodeRenderer();
-    private enum NavState { UNBUILT, BUILT, POPULATED }
+
+    /**
+     * Tracks this layout's rebuild lifecycle. Valid transitions: {@code UNBUILT → BUILT} via
+     * {@link #buildNav()}, {@code BUILT → POPULATED} via {@link #populateNav()}, and any
+     * state {@code → UNBUILT} via {@link #tearDownNav()}.
+     */
+    private enum NavState {
+        /** No nav components created yet. */
+        UNBUILT,
+        /** Structural shell (containers, active {@link NavStrategy}) created, awaiting population. */
+        BUILT,
+        /** Fully rendered and reactive — nav items populated from the current {@link NavGrouper}. */
+        POPULATED
+    }
     private NavState navState = NavState.UNBUILT;
 
     /**
@@ -139,6 +155,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         topBar.setWidthFull();
         topBar.setPadding(false);
         topBar.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+        // Prevents topBar from being flex-centred inside navbar-top (and jumping vertically)
+        // when viewHeaderSlot is hidden; see the topBarYStableWhen* IT tests.
         topBar.getStyle().set("min-height", "var(--lumo-size-xl)");
         topBar.addClassName("app-top-bar");
         topBar.add(new DrawerToggle());
@@ -157,6 +175,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         topBlock.add(topBar, viewHeaderSlot);
         super.addToNavbar(topBlock);
 
+        // Fires immediately with currentViewSignal == null, before any NavStrategy exists;
+        // rebuildViewHeader() explicitly no-ops in that case (see its activeStrategy == null guard).
         Signal.effect(this, () -> rebuildViewHeader(currentViewSignal.get()));
     }
 
@@ -186,6 +206,16 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     // ——————————— Nav-type switching ————————————
 
+    /**
+     * Orchestrates a full nav-type rebuild. No-ops if {@code navType} matches the
+     * already-{@link NavState#POPULATED} active nav type. Otherwise tears down the previous
+     * {@link NavStrategy} (if one was built), creates the strategy for {@code navType}, then
+     * runs it through the rebuild sequence: {@link #buildNav()} (structural components) →
+     * {@link #placeBrandAndUserContent()} (buffered brand/user content) → {@link #populateNav()}
+     * (nav items from the current {@link NavGrouper}, reaching {@link NavState#POPULATED}) →
+     * {@link #rebuildViewHeader} (view header for the current view). Fires
+     * {@link NavTypeChangedEvent} last, once the new nav type is fully in place.
+     */
     private void applyNavType(NavType navType) {
         if (navState == NavState.POPULATED && navType == this.activeNavType) {
             return;
@@ -222,6 +252,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void placeBrandAndUserContent() {
+        // No-op before nav is built (e.g. called from a subclass constructor via addBrandContent()/
+        // setUserMenu()); content is already buffered and gets placed by applyNavType() instead.
         if (navState == NavState.UNBUILT) {
             return;
         }
@@ -343,6 +375,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     /**
      * Sets the nav-group resolver used by the default {@link PathPrefixNavGrouper}.
      * Return {@code null} to use path-based grouping for an entry.
+     *
+     * <p>Takes effect via the default {@code PathPrefixNavGrouper}'s lambda closure over this
+     * field; has no effect if {@link #setNavGrouper} has been called with a custom grouper.
      */
     protected void setViewNavGroupResolver(Function<MenuEntry, NavGroup> resolver) {
         viewNavGroupResolver = resolver;
@@ -350,7 +385,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         repopulateNav();
     }
 
-    /** Sets the icon generator for leaf nav items. Return {@code null} or a supplier returning {@code null} to show no icon. */
+    /**
+     * Sets the icon generator for leaf nav items. Return {@code null} or a supplier returning
+     * {@code null} to show no icon.
+     *
+     * <p>Takes effect via the default {@code PathPrefixNavGrouper}'s lambda closure over this
+     * field; has no effect if {@link #setNavGrouper} has been called with a custom grouper.
+     */
     protected void setViewIconGenerator(Function<MenuEntry, Supplier<Icon>> generator) {
         viewIconGenerator = generator;
         repopulateNav();

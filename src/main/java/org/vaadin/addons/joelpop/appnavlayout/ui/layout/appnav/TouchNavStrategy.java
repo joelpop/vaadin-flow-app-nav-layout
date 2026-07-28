@@ -33,6 +33,8 @@ final class TouchNavStrategy implements NavStrategy {
     @Override
     public void build() {
         touchSecondaryTabBar = new TouchSecondaryTabBar(owner.navigationSignal);
+        // Allows the tab bar to shrink below its content width inside the flex topBar row
+        // (the flex-item default min-width:auto would otherwise force topBar to overflow).
         touchSecondaryTabBar.getStyle().set("min-width", "0");
         owner.topBar.add(touchSecondaryTabBar);
         owner.topBar.expand(touchSecondaryTabBar);
@@ -64,7 +66,9 @@ final class TouchNavStrategy implements NavStrategy {
             owner.setDrawerOpened(false);
         }
 
-        // touch-optimized ensures the navbar-bottom slot is rendered by AppLayout
+        // touch-optimized ensures the navbar-bottom slot is rendered by AppLayout. This is an
+        // AppLayout-internal custom property, not public API — verify it still exists and still
+        // means this against the AppLayout changelog when upgrading Vaadin.
         owner.getStyle().set("--vaadin-app-layout-touch-optimized", "true");
         owner.addToDrawer(drawerContent);
         owner.addToNavbar(true, touchNavBar);

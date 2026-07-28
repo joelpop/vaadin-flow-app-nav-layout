@@ -1,6 +1,9 @@
 package org.vaadin.addons.joelpop.appnavlayout.ui.nav;
 
-/** The navigation style to render for this session. */
+/**
+ * The navigation style to render for this session, selected by a {@link NavSelector}
+ * from the detected {@link DeviceType} and {@link Orientation}.
+ */
 public enum NavType {
     /** Touch-optimised bottom bar and secondary tab bar. */
     TOUCH,
