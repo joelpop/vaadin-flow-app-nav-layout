@@ -87,7 +87,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private static final int DEFAULT_TABLET_MIN_SHORT_SIDE_PX = 768;
 
     private String appTitle = "";
-    private NavSelector navSelector = NavSelector.defaultSelector();
+    // ValueSignal (not a plain field) so the window-resize Signal.effect in onAttach() can track
+    // it as a dependency and react automatically when setNavSelector() changes it.
+    private final ValueSignal<NavSelector> navSelectorSignal = new ValueSignal<>(NavSelector.defaultSelector());
     private int tabletMinShortSidePx = DEFAULT_TABLET_MIN_SHORT_SIDE_PX;
     private DeviceType deviceType;
 
@@ -176,7 +178,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      */
     protected AppNavLayout(String appTitle, NavSelector navSelector) {
         this(appTitle);
-        this.navSelector = navSelector;
+        navSelectorSignal.set(navSelector);
     }
 
     // ——————————— Nav-type switching ————————————
@@ -243,16 +245,18 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         // Null until async client-details round-trip completes; callers must null-check.
         var details = attachEvent.getUI().getPage().getExtendedClientDetails();
         deviceType = detectDeviceType(details, tabletMinShortSidePx);
-        applyNavType(navSelector.select(deviceType, detectOrientation(details)));
-        if (deviceType != DeviceType.DESKTOP) {
-            var page = attachEvent.getUI().getPage();
-            Signal.effect(this, () -> {
-                var size = page.windowSizeSignal().get();
-                var orientation = size.width() >= size.height()
-                        ? Orientation.LANDSCAPE : Orientation.PORTRAIT;
-                applyNavType(navSelector.select(deviceType, orientation));
-            });
-        }
+        var page = attachEvent.getUI().getPage();
+        // Registered with no direct applyNavType()
+        // call beforehand: this effect's own immediate first fire performs the initial apply for
+        // every device type. navSelectorSignal is a tracked dependency, so setNavSelector() later
+        // re-fires this automatically — no manual re-registration needed.
+        Signal.effect(this, () -> {
+            var selector = navSelectorSignal.get();
+            var size = page.windowSizeSignal().get();
+            var orientation = size.width() >= size.height()
+                    ? Orientation.LANDSCAPE : Orientation.PORTRAIT;
+            applyNavType(selector.select(deviceType, orientation));
+        });
     }
 
     // ——————————— Adaptive content API ————————————
@@ -458,7 +462,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         getUI().ifPresent(ui -> {
             var details = ui.getPage().getExtendedClientDetails();
             deviceType = detectDeviceType(details, tabletMinShortSidePx);
-            applyNavType(navSelector.select(deviceType, detectOrientation(details)));
+            applyNavType(navSelectorSignal.get().select(deviceType, detectOrientation(details)));
         });
         return this;
     }
@@ -468,16 +472,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      * device type and orientation. Default: {@link NavSelector#defaultSelector()}.
      *
      * <p>If the layout is already attached, the nav type is re-evaluated and
-     * re-applied immediately.
+     * re-applied immediately via the window-resize effect registered in
+     * {@link #onAttach}, which tracks this signal as a dependency.
      *
      * @return this, for chaining
      */
     public AppNavLayout setNavSelector(NavSelector selector) {
-        this.navSelector = selector;
-        getUI().ifPresent(ui -> {
-            var details = ui.getPage().getExtendedClientDetails();
-            applyNavType(navSelector.select(deviceType, detectOrientation(details)));
-        });
+        navSelectorSignal.set(selector);
         return this;
     }
 
