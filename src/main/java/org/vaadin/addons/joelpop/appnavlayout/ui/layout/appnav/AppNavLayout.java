@@ -13,6 +13,8 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderComponent;
 import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderTitle;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.ComponentEventListener;
+import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.dependency.JsModule;
@@ -29,6 +31,7 @@ import com.vaadin.flow.router.AfterNavigationObserver;
 import com.vaadin.flow.router.Location;
 import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
+import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.signals.Signal;
 import com.vaadin.flow.signals.local.ValueSignal;
 
@@ -193,6 +196,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             navState = NavState.UNBUILT;
         }
 
+        var previousNavType = this.activeNavType;
         this.activeNavType = navType;
         activeStrategy = (navType == NavType.SIDENAV)
                 ? new DesktopNavStrategy(this)
@@ -203,7 +207,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         populateNav();
         rebuildViewHeader(currentViewSignal.peek());
 
-        onNavTypeChanged(navType);
+        var event = new NavTypeChangedEvent(this, navType, previousNavType);
+        onNavTypeChanged(event);
+        ComponentUtil.fireEvent(this, event);
     }
 
     private void tearDownNav() {
@@ -391,11 +397,23 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // ——————————— Protected hooks ————————————
 
     /**
-     * Called whenever the active {@link NavType} is determined — including on
-     * first attachment, not just on later changes. Default is a no-op.
-     * Override to react to nav-type changes in subclass or companion code.
+     * Called whenever the active {@link NavType} is determined and applied — including on
+     * first attachment, not just on later changes. Default is a no-op. Override to react to
+     * nav-type changes in a subclass or companion code; for code that doesn't subclass
+     * {@code AppNavLayout}, see {@link #addNavTypeChangedListener}.
      */
-    protected void onNavTypeChanged(NavType navType) {
+    protected void onNavTypeChanged(NavTypeChangedEvent event) {
+    }
+
+    /**
+     * Adds a listener for {@link NavTypeChangedEvent}, fired whenever the active
+     * {@link NavType} is determined and applied — including on first attachment.
+     * For subclasses, overriding {@link #onNavTypeChanged} is usually simpler.
+     *
+     * @return a registration for removing the listener
+     */
+    public Registration addNavTypeChangedListener(ComponentEventListener<NavTypeChangedEvent> listener) {
+        return addListener(NavTypeChangedEvent.class, listener);
     }
 
     /** Application title supplied by the subclass. */
