@@ -43,7 +43,7 @@ public class MainLayout extends AppNavLayout {
 
         setViewIconGenerator(m -> Optional.ofNullable(m.menuClass())
                 .map(v -> v.getAnnotation(ViewIcon.class))
-                .map(a -> a.value().create())
+                .<Supplier<Icon>>map(a -> a.value()::create)
                 .orElse(null));
 
         setViewTitleGenerator(m -> Optional.ofNullable(m.menuClass())
@@ -66,11 +66,6 @@ public class MainLayout extends AppNavLayout {
 
         addBrandContent(new H1(getAppTitle()));
     }
-
-    @Override
-    protected Component createHeadroomComponent() {
-        return AppHeadroom.create(); // optional; requires vaadin-flow-app-headroom
-    }
 }
 ```
 
@@ -82,13 +77,12 @@ All configuration calls take effect immediately, even after the component is att
 |--------|---------|---------|
 | `addBrandContent(Component...)` | — | Logo/title in the header (desktop) or drawer top (mobile) |
 | `setUserMenu(Component)` | — | User widget in the header trailing (desktop) or drawer bottom (mobile) |
-| `setViewIconGenerator(Function<MenuEntry, Icon>)` | no icon | Icon for each leaf nav item |
+| `setViewIconGenerator(Function<MenuEntry, Supplier<Icon>>)` | no icon | Icon for each leaf nav item |
 | `setViewTitleGenerator(Function<MenuEntry, String>)` | `@Menu#title()` | Label for each leaf nav item |
 | `setViewNavGroupResolver(Function<MenuEntry, NavGroup>)` | path-based | Explicit group assignment for a view |
 | `setNavPathMatcher(BiPredicate<String, String>)` | `String::equals` | Active-item path matching |
 | `setNavGrouper(NavGrouper)` | `PathPrefixNavGrouper` | Full grouping strategy override |
 | `setNavNodeRenderer(ComponentRenderer<SideNavItem, NavNode>)` | built-in | Custom desktop `SideNavItem` renderer |
-| `createHeadroomComponent()` | `null` (no headroom) | Optional scroll-hide header component |
 
 ## Nav grouping
 
@@ -129,14 +123,14 @@ Both interfaces provide no-op defaults; implement only what is needed.
 | `Orientation` | `PORTRAIT`, `LANDSCAPE` — re-evaluated on window resize for touch devices |
 | `NavGroup` | Interface: `title()`, `icon()`, `parent()` — metadata for an explicit group node |
 | `NavNode` | Immutable tree node: either a navigable leaf (`menuEntry()` present) or a non-navigable group |
-| `RouteNavUtils` | Static helpers: `pathSegments`, `normalizedPath`, `routeSegmentLabel`, `rootPrefix`, `leafTitle` |
+| `RouteNavUtils` | Static helpers: `pathSegments`, `normalizedPath`, `routeSegmentLabel`, `leafTitle` |
 
 ## Development
 
 ### Running the demo
 
 ```
-mvn jetty:run -Pdevelopment
+mvn jetty:run
 ```
 
 Starts the test/demo server at http://localhost:8080.
@@ -144,24 +138,16 @@ Starts the test/demo server at http://localhost:8080.
 ### Integration tests
 
 ```
-mvn verify -Pit,production
+mvn verify -Pit
 ```
 
 Tests run in headless mode by default. To disable headless mode:
 
 ```
-mvn verify -Pit,production -Dtest.headless=false
+mvn verify -Pit -Dplaywright.headed=true
 ```
 
 ## Publishing to Vaadin Directory
-
-You should change the `organization.name` property in `pom.xml` to your own name/organization.
-
-```xml
-<organization>
-    <name>###author###</name>
-</organization>
-```
 
 You can create the zip package needed for [Vaadin Directory](https://vaadin.com/directory/) using
 

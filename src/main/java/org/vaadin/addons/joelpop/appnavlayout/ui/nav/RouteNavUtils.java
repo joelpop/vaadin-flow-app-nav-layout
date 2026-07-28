@@ -56,7 +56,7 @@ public final class RouteNavUtils {
      * Falls back to the path when no title is present.
      */
     public static String leafTitle(MenuEntry entry) {
-        return entry.title() != null ? entry.title() : entry.path();
+        return entry.title() != null ? entry.title() : normalizedPath(entry);
     }
 
 }
