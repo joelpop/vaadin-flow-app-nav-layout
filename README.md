@@ -5,6 +5,7 @@ A Vaadin Flow base layout providing adaptive navigation: a bottom icon bar with 
 ## Table of Contents
 
 - [How it works](#how-it-works)
+- [Screenshots](#screenshots)
 - [Usage](#usage)
 - [Configuration reference](#configuration-reference)
 - [Nav grouping](#nav-grouping)
@@ -29,6 +30,37 @@ A Vaadin Flow base layout providing adaptive navigation: a bottom icon bar with 
 - **Side navigation drawer** — hierarchical `SideNav` with icon-prefixed group headers, collapsed by default, toggled by a `DrawerToggle` in the header
 
 The nav type re-evaluates dynamically on touch devices whenever the viewport size changes (rotation, split-screen resize), switching components in place without a page reload.
+
+## Screenshots
+
+<table>
+<tr>
+<td align="center" colspan="2">
+<img src="README-images/desktop.png" width="480"><br>
+<sub><b>Desktop</b> — <code>SIDENAV</code> drawer</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="40%">
+<img src="README-images/tablet-portrait.png" width="220"><br>
+<sub><b>Tablet, portrait</b> — <code>RAIL</code></sub>
+</td>
+<td align="center">
+<img src="README-images/tablet-landscape.png" width="320"><br>
+<sub><b>Tablet, landscape</b> — <code>SIDENAV</code> drawer</sub>
+</td>
+</tr>
+<tr>
+<td align="center">
+<img src="README-images/phone-portrait.png" width="140"><br>
+<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a popover</sub>
+</td>
+<td align="center">
+<img src="README-images/phone-landscape.png" width="300"><br>
+<sub><b>Phone, landscape</b> — <code>TOUCH</code> bottom bar, wide enough that nothing overflows</sub>
+</td>
+</tr>
+</table>
 
 ## Usage
 
@@ -116,14 +148,14 @@ Both interfaces provide no-op defaults; implement only what is needed.
 
 ## Supporting types
 
-| Type | Description |
-|------|-------------|
-| `NavType` | `TOUCH`, `RAIL`, `SIDENAV` — the active nav style |
-| `DeviceType` | `PHONE`, `TABLET`, `DESKTOP` — detected from touch capability and screen size |
-| `Orientation` | `PORTRAIT`, `LANDSCAPE` — re-evaluated on window resize for touch devices |
-| `NavGroup` | Interface: `title()`, `icon()`, `parent()` — metadata for an explicit group node |
-| `NavNode` | Immutable tree node: either a navigable leaf (`menuEntry()` present) or a non-navigable group |
-| `RouteNavUtils` | Static helpers: `pathSegments`, `normalizedPath`, `routeSegmentLabel`, `leafTitle` |
+| Type            | Description                                                                                   |
+|-----------------|-----------------------------------------------------------------------------------------------|
+| `NavType`       | `TOUCH`, `RAIL`, `SIDENAV` — the active nav style                                             |
+| `DeviceType`    | `PHONE`, `TABLET`, `DESKTOP` — detected from touch capability and screen size                 |
+| `Orientation`   | `PORTRAIT`, `LANDSCAPE` — re-evaluated on window resize for touch devices                     |
+| `NavGroup`      | Interface: `title()`, `icon()`, `parent()` — metadata for an explicit group node              |
+| `NavNode`       | Immutable tree node: either a navigable leaf (`menuEntry()` present) or a non-navigable group |
+| `RouteNavUtils` | Static helpers: `pathSegments`, `normalizedPath`, `routeSegmentLabel`, `leafTitle`            |
 
 ## Development
 
