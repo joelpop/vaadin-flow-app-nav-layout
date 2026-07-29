@@ -519,8 +519,9 @@ class AppNavLayoutIT {
 
     @Test
     void railBarIsAtViewportLeftEdge() {
-        // The rail (navbar-bottom) is pinned to inset-inline-start:0 so AppHeadroom
-        // can slide the top bar without leaving a gap above the rail.
+        // The rail (navbar-bottom) is pinned to inset-inline-start:0 unconditionally so it
+        // never has to react to the top bar's position — any component that repositions or
+        // animates the top bar still sees a stable, gap-free left edge from the rail.
         newTabletPortraitPage();
         navigateTo("/");
         pauseForHumanIfHeaded();

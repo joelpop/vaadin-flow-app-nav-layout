@@ -22,3 +22,4 @@ error-screenshots/
 package.json
 package-lock.json
 src/main/bundles/
+/.playwright-mcp/

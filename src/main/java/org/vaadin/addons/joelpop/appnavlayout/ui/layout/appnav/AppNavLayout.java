@@ -506,8 +506,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     /**
      * Overrides the physical-screen-shorter-side threshold, in CSS pixels,
      * used to distinguish {@link DeviceType#TABLET} from {@link DeviceType#PHONE}
-     * among touch devices (default {@code 768}, matching
-     * {@code vaadin-flow-app-headroom}'s equivalent device detection).
+     * among touch devices (default {@code 768} — the common responsive-design
+     * convention for the tablet/phone boundary, matching an iPad's portrait-mode
+     * shortest side and Bootstrap's {@code md} breakpoint).
      *
      * <p>If the layout is already attached, device type is re-evaluated and the
      * nav type re-applied immediately.

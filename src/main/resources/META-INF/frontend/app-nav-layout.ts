@@ -32,7 +32,7 @@ GLOBAL_STYLES.replaceSync(`
 
     /* Rail: pin navbar-bottom slot to the full left edge, top to bottom.
        Starting at 0 (not at navbar-offset-top) means the rail never jumps when
-       navigation changes the header height, and headroom-style header hiding does
+       navigation changes the header height, and a scroll-hiding top bar does
        not leave a gap above the rail. The companion ::part(navbar) rule below
        keeps the fixed top bar out of the rail's x=0–5rem strip. */
     vaadin-app-layout[nav-rail]::part(navbar-bottom) {
