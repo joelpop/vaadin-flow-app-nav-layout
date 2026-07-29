@@ -24,6 +24,12 @@ public final class RouteNavUtils {
      */
     public static List<String> pathSegments(String routePath) {
         var p = routePath != null && routePath.startsWith("/") ? routePath.substring(1) : routePath;
+        if (p == null || p.isEmpty()) {
+            // Location("").getSegments() returns a single-element list containing an empty
+            // string, not an empty list — normalize that here so callers checking isEmpty()/
+            // size() get the documented, intuitive result for the root path.
+            return List.of();
+        }
         return new Location(p).getSegments();
     }
 

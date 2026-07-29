@@ -81,12 +81,6 @@
             <version>1.61.0</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.vaadin</groupId>
-            <artifactId>vaadin-testbench-junit6</artifactId>
-            <scope>test</scope>
-            <optional>true</optional>
-        </dependency>
     </dependencies>
 
     <build>
@@ -101,6 +95,12 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -262,6 +262,34 @@
             <id>it</id>
             <build>
                 <plugins>
+                    <!-- Disables Vaadin Copilot's dev-mode overlay before Jetty starts (EMBED
+                         deploy mode runs the webapp in-process with Maven, so a system property
+                         set here is visible to it). Without this, Copilot's overlay intercepts
+                         Playwright's pointer-event actionability checks on genuinely clickable
+                         elements underneath it. -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>properties-maven-plugin</artifactId>
+                        <version>1.2.1</version>
+                        <executions>
+                            <execution>
+                                <id>disable-copilot-for-it</id>
+                                <phase>process-test-classes</phase>
+                                <goals>
+                                    <goal>set-system-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <properties>
+                                        <property>
+                                            <name>vaadin.copilot.enable</name>
+                                            <value>false</value>
+                                        </property>
+                                    </properties>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
                     <plugin>
                         <groupId>org.eclipse.jetty.ee11</groupId>
                         <artifactId>jetty-ee11-maven-plugin</artifactId>

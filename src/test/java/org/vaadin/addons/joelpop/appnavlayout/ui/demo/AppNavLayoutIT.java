@@ -3,6 +3,7 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.demo;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.LoadState;
@@ -107,8 +108,11 @@ class AppNavLayoutIT {
     private void navigateTo(String path) {
         page.navigate(BASE_URL + path);
         page.waitForLoadState(LoadState.NETWORKIDLE);
-        // Extra settle time for ResizeObserver (fires in next animation frame after layout).
-        page.waitForTimeout(150);
+        // Wait for the ResizeObserver's callback (fires in the next animation frame after
+        // layout) instead of guessing a fixed delay: two rAFs guarantee the browser has painted
+        // the post-layout frame and dispatched the observer callback.
+        page.evaluate("() => new Promise(resolve => "
+                + "requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     }
 
     // ——————————— AppLayout shadow DOM helpers ————————————
@@ -159,6 +163,15 @@ class AppNavLayoutIT {
         if (headed) page.waitForTimeout(pauseMs);
     }
 
+    // vaadin-app-layout's own overlay backdrop (RAIL mode, drawer opened) sits on top of the
+    // page and intercepts pointer events for Playwright's normal actionability checks, even
+    // though the target is genuinely visible and clickable to a real user. Force bypasses that
+    // check. (Vaadin Copilot's dev-mode overlay used to cause the same problem elsewhere; it's
+    // disabled for this profile via vaadin.copilot.enable=false in the pom's it profile.)
+    private void forceClick(Locator locator) {
+        locator.click(new Locator.ClickOptions().setForce(true));
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // ORIGINAL TESTS — touch nav items, secondary nav, orientation changes
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -186,14 +199,14 @@ class AppNavLayoutIT {
         pauseForHumanIfHeaded();
 
         // Narrow to overflow territory: 1 primary + overflow button = 2 touch-nav-items.
+        // hasCount() is a Playwright web-first assertion that polls until it matches (or times
+        // out), so no explicit wait is needed for the Signal.effect to fire and the DOM to settle.
         page.setViewportSize(NARROW_WIDTH, PHONE_HEIGHT);
-        page.waitForTimeout(200); // let the Signal.effect fire and DOM settle
         assertThat(page.locator(".touch-nav-item")).hasCount(2);
         pauseForHumanIfHeaded();
 
         // Widen back: buildItems() fires again; icons must be freshly created, not moved.
         page.setViewportSize(PHONE_WIDTH, PHONE_HEIGHT);
-        page.waitForTimeout(200);
         assertThat(page.locator(".touch-nav-item")).hasCount(3);
         assertThat(page.locator(".touch-nav-item vaadin-icon")).hasCount(3);
         pauseForHumanIfHeaded();
@@ -242,11 +255,17 @@ class AppNavLayoutIT {
 
         // Rotate to landscape — default selector switches to SIDENAV.
         page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
-        page.waitForTimeout(300);
+        page.waitForFunction(
+            "() => !document.querySelector('vaadin-app-layout').hasAttribute('nav-rail')",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(3000));
 
         // Rotate back to portrait — RAIL rebuilds; overlay mode must be restored.
         page.setViewportSize(TABLET_PORTRAIT_WIDTH, TABLET_PORTRAIT_HEIGHT);
-        page.waitForTimeout(300);
+        page.waitForFunction(
+            "() => document.querySelector('vaadin-app-layout').hasAttribute('nav-rail')",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(3000));
 
         assertTrue((boolean) page.evaluate("() => document.querySelector('vaadin-app-layout').overlay"),
                 "drawer should remain in overlay mode after orientation change back to portrait");
@@ -262,12 +281,16 @@ class AppNavLayoutIT {
 
         // Rotate to landscape — default selector switches to SIDENAV
         page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
-        page.waitForTimeout(300);
+        page.waitForFunction(
+            "() => !document.querySelector('vaadin-app-layout').hasAttribute('nav-rail')",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(3000));
         pauseForHumanIfHeaded();
 
-        // Rotate back to portrait — RAIL rebuilds; secondary nav must reappear
+        // Rotate back to portrait — RAIL rebuilds; secondary nav must reappear.
+        // isVisible() is a Playwright web-first assertion that polls until it matches (or times
+        // out), so no explicit wait is needed beforehand.
         page.setViewportSize(TABLET_PORTRAIT_WIDTH, TABLET_PORTRAIT_HEIGHT);
-        page.waitForTimeout(300);
         assertThat(page.locator(".secondary-tab-bar vaadin-tabs")).isVisible();
         pauseForHumanIfHeaded();
     }
@@ -671,5 +694,84 @@ class AppNavLayoutIT {
         // On desktop, the drawer is persistent (push mode), not overlay.
         assertFalse((boolean) page.evaluate("() => document.querySelector('vaadin-app-layout').overlay"),
             "drawer must NOT be in overlay mode in SIDENAV mode");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // BLIND SPOTS — overflow popover navigation, HasViewHeaderTitle (desktop),
+    // DrawerToggle, custom NavSelector
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    @Test
+    void overflowPopoverNavigatesToSelectedView() {
+        newPhonePage();
+        navigateTo("/");
+        // Narrow to overflow territory: 1 primary item + "More" overflow button.
+        page.setViewportSize(NARROW_WIDTH, PHONE_HEIGHT);
+        assertThat(page.locator(".touch-nav-item")).hasCount(2);
+        pauseForHumanIfHeaded();
+
+        // Vaadin's Popover only opens on a real, trusted client click; a synthetic Playwright
+        // click on its target dispatches the event but doesn't reliably trigger the open —
+        // open it directly instead. The thing actually under test here is this project's own
+        // navigation wiring on the overflow item click, not Popover's own open trigger.
+        page.evaluate("() => document.querySelector('vaadin-popover').opened = true");
+        assertThat(page.locator(".overflow-nav-item").first()).isVisible();
+        pauseForHumanIfHeaded();
+
+        page.locator(".overflow-nav-item").first().click();
+        page.waitForURL(url -> !url.equals(BASE_URL + "/"),
+            new Page.WaitForURLOptions().setTimeout(3000));
+        pauseForHumanIfHeaded();
+    }
+
+    @Test
+    void viewHeaderTitleAppearsOnDesktopForHasViewHeaderTitleView() {
+        page.setViewportSize(DESKTOP_WIDTH, DESKTOP_HEIGHT);
+        navigateTo("/catalog/titled"); // TitledDetailView implements HasViewHeaderTitle
+        pauseForHumanIfHeaded();
+
+        assertThat(page.locator(".view-header-slot")).isVisible();
+        assertThat(page.locator(".view-header-slot h2")).hasText("Titled Detail");
+        assertThat(page.locator(".view-header-slot vaadin-icon")).isVisible();
+    }
+
+    @Test
+    void drawerToggleOpensAndClosesDrawerInRailMode() {
+        newTabletPortraitPage();
+        navigateTo("/");
+        pauseForHumanIfHeaded();
+
+        assertFalse((boolean) page.evaluate("() => document.querySelector('vaadin-app-layout').drawerOpened"),
+            "drawer must be closed before toggling");
+
+        forceClick(page.locator("vaadin-drawer-toggle"));
+        page.waitForFunction(
+            "() => document.querySelector('vaadin-app-layout').drawerOpened",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(3000));
+        pauseForHumanIfHeaded();
+
+        forceClick(page.locator("vaadin-drawer-toggle"));
+        page.waitForFunction(
+            "() => !document.querySelector('vaadin-app-layout').drawerOpened",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(3000));
+        pauseForHumanIfHeaded();
+    }
+
+    @Test
+    void customNavSelectorOverridesDefaultDeviceMapping() {
+        // Phone viewport would normally select TOUCH under the default selector, but
+        // AlwaysSidenavLayout's custom NavSelector always returns SIDENAV. This only checks
+        // that the SIDENAV component set (not TOUCH) was built — AppLayout's own responsive
+        // drawer-open/overlay behavior is driven by actual viewport width, independently of
+        // our NavType, so a narrow viewport may still leave the drawer closed by default;
+        // that's a separate concern from which nav-type strategy got selected.
+        newPhonePage();
+        navigateTo("/always-sidenav");
+        pauseForHumanIfHeaded();
+
+        assertThat(page.locator("vaadin-side-nav")).hasCount(1);
+        assertThat(page.locator(".touch-nav-item")).hasCount(0);
     }
 }
