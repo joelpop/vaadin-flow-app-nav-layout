@@ -1,18 +1,20 @@
 package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
+import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderComponent;
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
-import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 
 /**
  * {@link NavStrategy} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#TOUCH} and
- * {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#RAIL}: a bottom/rail {@link TouchNavBar}
- * plus a drawer split into brand (top) and user (bottom) slots. {@code rail} selects the
- * rail-specific layout (column direction, fixed-width overlay drawer); otherwise this is the
- * ordinary phone bottom-bar layout.
+ * {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#RAIL}: a bottom/rail nav slot
+ * rendered by whichever {@link NavRenderer} {@link AppNavLayout#resolveNavRenderer()} resolves
+ * for the current scenario (default: {@link TouchBarNavRenderer}/{@link SideRailNavRenderer}),
+ * a shared header-nav slot for drill-down content, plus a drawer split into brand (top) and
+ * user (bottom) slots. {@code rail} selects the rail-specific chrome (column layout,
+ * fixed-width overlay drawer); otherwise this is the ordinary phone bottom-bar chrome.
  */
 final class TouchNavStrategy implements NavStrategy {
 
@@ -22,8 +24,12 @@ final class TouchNavStrategy implements NavStrategy {
     private VerticalLayout brandDrawerSlot;
     private VerticalLayout userDrawerSlot;
     private VerticalLayout drawerContent;
-    private TouchSecondaryTabBar touchSecondaryTabBar;
-    private TouchNavBar touchNavBar;
+    private Div headerNavSlot;
+    private Div primaryNavSlot;
+    // Unused by this NavType (the drawer, and whichever of sideRail/touchBar isn't active) —
+    // shared, never-attached placeholder so NavRenderer implementations can safely call any
+    // NavSlots accessor without a null check.
+    private final Div inertSlot = new Div();
 
     TouchNavStrategy(AppNavLayout owner, boolean rail) {
         this.owner = owner;
@@ -32,12 +38,14 @@ final class TouchNavStrategy implements NavStrategy {
 
     @Override
     public void build() {
-        touchSecondaryTabBar = new TouchSecondaryTabBar(owner.navigationSignal);
-        // Allows the tab bar to shrink below its content width inside the flex topBar row
-        // (the flex-item default min-width:auto would otherwise force topBar to overflow).
-        touchSecondaryTabBar.getStyle().set("min-width", "0");
-        owner.topBar.add(touchSecondaryTabBar);
-        owner.topBar.expand(touchSecondaryTabBar);
+        headerNavSlot = new Div();
+        headerNavSlot.setWidthFull();
+        // Allows the header-nav content to shrink below its content width inside the flex
+        // topBar row (the flex-item default min-width:auto would otherwise force topBar to
+        // overflow).
+        headerNavSlot.getStyle().set("min-width", "0");
+        owner.topBar.add(headerNavSlot);
+        owner.topBar.expand(headerNavSlot);
 
         brandDrawerSlot = new VerticalLayout();
         brandDrawerSlot.setPadding(false);
@@ -54,16 +62,17 @@ final class TouchNavStrategy implements NavStrategy {
         drawerContent.add(brandDrawerSlot, userDrawerSlot);
         drawerContent.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
 
-        var page = UI.getCurrent().getPage();
-        var direction = rail ? FlexLayout.FlexDirection.COLUMN : FlexLayout.FlexDirection.ROW;
-        touchNavBar = new TouchNavBar(owner.navigationSignal, page, direction);
-
+        primaryNavSlot = new Div();
         if (rail) {
+            primaryNavSlot.setSizeFull();
             owner.getElement().setAttribute("nav-rail", "");
             owner.getStyle().set("--vaadin-app-layout-drawer-overlay", "true");
             owner.getStyle().set("--nav-rail-width", "5rem");
             owner.getStyle().set("padding-inline-start", "var(--nav-rail-width)");
             owner.setDrawerOpened(false);
+        }
+        else {
+            primaryNavSlot.setWidthFull();
         }
 
         // touch-optimized ensures the navbar-bottom slot is rendered by AppLayout. This is an
@@ -71,16 +80,16 @@ final class TouchNavStrategy implements NavStrategy {
         // means this against the AppLayout changelog when upgrading Vaadin.
         owner.getStyle().set("--vaadin-app-layout-touch-optimized", "true");
         owner.addToDrawer(drawerContent);
-        owner.addToNavbar(true, touchNavBar);
+        owner.addToNavbar(true, primaryNavSlot);
     }
 
     @Override
     public void tearDown() {
-        owner.topBar.remove(touchSecondaryTabBar);
-        touchNavBar.getElement().removeFromParent();
+        headerNavSlot.getElement().removeFromParent();
+        primaryNavSlot.getElement().removeFromParent();
         drawerContent.getElement().removeFromParent();
-        touchSecondaryTabBar = null;
-        touchNavBar = null;
+        headerNavSlot = null;
+        primaryNavSlot = null;
         brandDrawerSlot = null;
         userDrawerSlot = null;
         drawerContent = null;
@@ -105,9 +114,11 @@ final class TouchNavStrategy implements NavStrategy {
 
     @Override
     public void populate() {
-        touchNavBar.setPathMatcher(owner.navPathMatcher);
-        touchSecondaryTabBar.setNavGrouper(owner.navGrouper);
-        touchNavBar.setNavGrouper(owner.navGrouper);
+        var slots = rail
+                ? new NavSlotsImpl(inertSlot, primaryNavSlot, inertSlot, headerNavSlot)
+                : new NavSlotsImpl(inertSlot, inertSlot, primaryNavSlot, headerNavSlot);
+        var context = new NavRenderContextImpl(owner.navGrouper, owner.navigationSignal.peek().getPath(), slots);
+        owner.resolveNavRenderer(rail ? NavType.RAIL : NavType.TOUCH).render(context);
     }
 
     @Override

@@ -1,27 +1,30 @@
 package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
-import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
+import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderComponent;
 import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderTitle;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.sidenav.SideNav;
-import com.vaadin.flow.component.sidenav.SideNavItem;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
-import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
-import java.util.LinkedHashMap;
-
-/** {@link NavStrategy} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#SIDENAV}: header brand/user content plus a drawer {@link SideNav}. */
+/** {@link NavStrategy} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#SIDENAV}:
+ *  header brand/user content, plus a drawer nav slot rendered by whichever {@link NavRenderer}
+ *  {@link AppNavLayout#resolveNavRenderer()} resolves for the current scenario (default:
+ *  {@link SideNavDrawerNavRenderer}, building a {@link SideNav}). */
 final class DesktopNavStrategy implements NavStrategy {
 
     private final AppNavLayout owner;
 
     private HorizontalLayout brandContainer;
     private HorizontalLayout userContainer;
-    private SideNav sideNav;
+    private VerticalLayout drawerNavSlot;
+    // Unused by this NavType — shared, never-attached placeholder so NavRenderer implementations
+    // can safely call any NavSlots accessor without a null check.
+    private final Div inertSlot = new Div();
 
     DesktopNavStrategy(AppNavLayout owner) {
         this.owner = owner;
@@ -42,18 +45,21 @@ final class DesktopNavStrategy implements NavStrategy {
 
         owner.viewHeaderSlot.addClassNames(LumoUtility.Border.BOTTOM, LumoUtility.BorderColor.CONTRAST_10);
 
-        sideNav = new SideNav();
-        owner.addToDrawer(sideNav);
+        drawerNavSlot = new VerticalLayout();
+        drawerNavSlot.setPadding(false);
+        drawerNavSlot.setSpacing(false);
+        drawerNavSlot.setSizeFull();
+        owner.addToDrawer(drawerNavSlot);
     }
 
     @Override
     public void tearDown() {
         owner.topBar.remove(brandContainer, userContainer);
-        sideNav.getElement().removeFromParent();
+        drawerNavSlot.getElement().removeFromParent();
         owner.viewHeaderSlot.removeClassNames(LumoUtility.Border.BOTTOM, LumoUtility.BorderColor.CONTRAST_10);
         brandContainer = null;
         userContainer = null;
-        sideNav = null;
+        drawerNavSlot = null;
     }
 
     @Override
@@ -68,7 +74,9 @@ final class DesktopNavStrategy implements NavStrategy {
 
     @Override
     public void populate() {
-        populateSideNav();
+        var slots = new NavSlotsImpl(drawerNavSlot, inertSlot, inertSlot, inertSlot);
+        var context = new NavRenderContextImpl(owner.navGrouper, owner.navigationSignal.peek().getPath(), slots);
+        owner.resolveNavRenderer(NavType.SIDENAV).render(context);
     }
 
     @Override
@@ -84,36 +92,5 @@ final class DesktopNavStrategy implements NavStrategy {
         if (actionComponent != null) {
             owner.viewHeaderSlot.add(actionComponent);
         }
-    }
-
-    private void populateSideNav() {
-        sideNav.removeAll();
-        var sideNavItems = new LinkedHashMap<NavNode, SideNavItem>();
-
-        MenuConfiguration.getMenuEntries().forEach(entry -> {
-            var node = owner.navGrouper.nodeFor(entry);
-            ensureAncestors(node, sideNavItems, owner.navNodeRenderer);
-            var item = owner.navNodeRenderer.createComponent(node);
-            sideNavItems.put(node, item);
-            node.parent()
-                    .ifPresentOrElse(
-                            parent -> sideNavItems.get(parent).addItem(item),
-                            () -> sideNav.addItem(item));
-        });
-    }
-
-    private void ensureAncestors(NavNode node, LinkedHashMap<NavNode, SideNavItem> sideNavItems,
-                                  ComponentRenderer<SideNavItem, NavNode> renderer) {
-        node.parent().ifPresent(parent -> {
-            if (!sideNavItems.containsKey(parent)) {
-                ensureAncestors(parent, sideNavItems, renderer);
-                var item = renderer.createComponent(parent);
-                sideNavItems.put(parent, item);
-                parent.parent()
-                        .ifPresentOrElse(
-                                grandparent -> sideNavItems.get(grandparent).addItem(item),
-                                () -> sideNav.addItem(item));
-            }
-        });
     }
 }
