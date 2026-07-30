@@ -53,6 +53,10 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     private final FlexLayout.FlexDirection direction;
 
     private NavGrouper navGrouper;
+    // The path render() was last called with — needed so the resize-driven Signal.effect below
+    // (which can fire independently of render(), e.g. a phone rotating without a NavType change)
+    // can re-apply active highlighting after it rebuilds items, not just on the next navigation.
+    private String currentPath = "";
 
     // ——————————— Primary bar state ————————————
     private FlexLayout bar;
@@ -95,10 +99,11 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     @Override
     public void render(NavRenderContext context) {
         this.navGrouper = context.navGrouper();
+        this.currentPath = context.currentPath();
         ensureBuilt(context.slots());
         buildItems();
-        highlightActive(context.currentPath());
-        rebuildForPath(context.currentPath());
+        highlightActive(currentPath);
+        rebuildForPath(currentPath);
     }
 
     /**
@@ -133,6 +138,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
                 if (newMax != maxIcons) {
                     maxIcons = newMax;
                     buildItems();
+                    highlightActive(currentPath);
                 }
             });
             primary.add(bar);

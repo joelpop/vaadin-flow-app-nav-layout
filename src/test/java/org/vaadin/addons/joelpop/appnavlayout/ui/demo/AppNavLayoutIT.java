@@ -213,6 +213,30 @@ class AppNavLayoutIT {
     }
 
     @Test
+    void touchNavActiveHighlightSurvivesResizeDrivenRebuild() {
+        // Regression test: on a real device, rotating a phone doesn't change NavType (both
+        // orientations resolve to TOUCH), so only the bar's own resize-driven Signal.effect
+        // rebuilds items — nothing else re-invokes render()/highlightActive() the way a
+        // navigation would. Crossing the overflow threshold here exercises that exact same
+        // internal rebuild path (proven to fire reliably in this harness by
+        // touchNavIconsRemainCorrectAfterNavBarRebuild), so it's an equally valid way to catch
+        // "rebuilt items lost their active highlight" without depending on a literal
+        // width/height swap actually crossing the threshold in headless Playwright.
+        newPhonePage();
+        navigateTo("/catalog/products");
+        pauseForHumanIfHeaded();
+
+        // "Catalog" root item is active for a nested catalog/* route.
+        assertThat(page.locator(".touch-nav-item")).hasCount(3);
+        assertThat(page.locator(".touch-nav-item.active")).hasCount(1);
+
+        page.setViewportSize(NARROW_WIDTH, PHONE_HEIGHT);
+        assertThat(page.locator(".touch-nav-item")).hasCount(2);
+        assertThat(page.locator(".touch-nav-item.active")).hasCount(1);
+        pauseForHumanIfHeaded();
+    }
+
+    @Test
     void sideNavRendersAtDesktopViewport() {
         page.setViewportSize(DESKTOP_WIDTH, DESKTOP_HEIGHT);
         navigateTo("/");
