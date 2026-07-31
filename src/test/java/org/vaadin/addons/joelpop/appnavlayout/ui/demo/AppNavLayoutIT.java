@@ -849,4 +849,35 @@ class AppNavLayoutIT {
         assertEquals(num(navbarTopRect, "width"), headerWidth, 1.0,
                 "header must fill the full width of its containing navbar-top part beside the rail");
     }
+
+    @Test
+    void touchNavAccountsForSafeAreaInsetsWhenComputingCapacity() {
+        // Regression test: the "how many icons fit" calculation used window.innerWidth as
+        // reported by page.windowSizeSignal() — which on a notched/rounded-corner device
+        // includes an unsafe strip an icon can't actually render into. Simulate that strip
+        // (there's no way to make headless Chromium report a real env(safe-area-inset-*)
+        // value) and confirm capacity shrinks to account for it, the same way it already
+        // shrinks for a genuinely narrower window.
+        newPhonePage();
+        page.setViewportSize(250, PHONE_HEIGHT);
+        navigateTo("/");
+        pauseForHumanIfHeaded();
+
+        // Baseline: floor(250 / MIN_SLOT_PX=72) = 3, exactly enough for all 3 root sections.
+        assertThat(page.locator(".touch-nav-item")).hasCount(3);
+
+        page.evaluate("""
+            () => {
+                document.documentElement.style.setProperty('--nav-safe-area-inset-left', '40px');
+                document.documentElement.style.setProperty('--nav-safe-area-inset-right', '40px');
+            }
+            """);
+        page.setViewportSize(256, PHONE_HEIGHT);
+        pauseForHumanIfHeaded();
+
+        // 256px minus the 80px simulated strip leaves 176px: floor(176/72) = 2, one fewer than
+        // the 3 root sections — the last must collapse into the "More" overflow trigger (both
+        // the 1 remaining primary item and "More" itself carry the touch-nav-item class).
+        assertThat(page.locator(".touch-nav-item")).hasCount(2);
+    }
 }

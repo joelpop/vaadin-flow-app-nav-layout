@@ -19,6 +19,19 @@
 
 const GLOBAL_STYLES = new CSSStyleSheet();
 GLOBAL_STYLES.replaceSync(`
+    /* Bridges the env() safe-area-inset-* values (unsafe strips behind a device notch,
+       rounded corners, or home indicator) onto custom properties so Java code can read them
+       via getComputedStyle — env() itself isn't queryable directly, only through a property
+       it's been assigned to. Read by AbstractTouchNavRenderer to keep the "how many icons fit"
+       calculation from overestimating on notched devices, where window.innerWidth/innerHeight
+       includes those unsafe strips but a labeled icon can't actually render inside them. */
+    :root {
+        --nav-safe-area-inset-top: env(safe-area-inset-top, 0px);
+        --nav-safe-area-inset-right: env(safe-area-inset-right, 0px);
+        --nav-safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+        --nav-safe-area-inset-left: env(safe-area-inset-left, 0px);
+    }
+
     /* Ensure the layout always fills the viewport so position:fixed elements anchor
        correctly in iOS PWA mode regardless of whether the html/body height chain is set. */
     vaadin-app-layout {

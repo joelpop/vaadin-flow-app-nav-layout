@@ -139,13 +139,28 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
             var page = UI.getCurrent().getPage();
             Signal.effect(bar, () -> {
                 var size = page.windowSizeSignal().get();
-                var available = direction == FlexLayout.FlexDirection.COLUMN ? size.height() : size.width();
-                var newMax = Math.max(1, available / MIN_SLOT_PX);
-                if (newMax != maxIcons) {
-                    maxIcons = newMax;
-                    buildItems();
-                    highlightActive(currentPath);
-                }
+                var rawAvailable = direction == FlexLayout.FlexDirection.COLUMN ? size.height() : size.width();
+                // window.innerWidth/innerHeight (what size above is built from) includes the
+                // unsafe strip behind a device notch, rounded corners, or home indicator — an
+                // icon can't actually render there, so subtract it before deciding how many fit.
+                // Only a JS round trip can read env(safe-area-inset-*); see the custom properties
+                // it's bridged onto in app-nav-layout.ts.
+                bar.getElement().executeJs(
+                        "var s = getComputedStyle(document.documentElement);"
+                        + "function px(name) { return parseFloat(s.getPropertyValue(name)) || 0; }"
+                        + "return $0"
+                        + "  ? px('--nav-safe-area-inset-top') + px('--nav-safe-area-inset-bottom')"
+                        + "  : px('--nav-safe-area-inset-left') + px('--nav-safe-area-inset-right');",
+                        direction == FlexLayout.FlexDirection.COLUMN)
+                        .then(Double.class, unsafeInsetPx -> {
+                            var available = rawAvailable - unsafeInsetPx;
+                            var newMax = Math.max(1, (int) (available / MIN_SLOT_PX));
+                            if (newMax != maxIcons) {
+                                maxIcons = newMax;
+                                buildItems();
+                                highlightActive(currentPath);
+                            }
+                        });
             });
             primary.add(bar);
             attachedPrimarySlot = primary;
