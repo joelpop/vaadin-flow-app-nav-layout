@@ -310,7 +310,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
-        // Null until async client-details round-trip completes; callers must null-check.
+        // Never null. Browser details are collected during UI init, so in normal operation
+        // this is already fully populated by the time onAttach() runs; only in rare cases does
+        // it return a placeholder with -1 dimensions (not null) if collection hasn't finished.
         var details = attachEvent.getUI().getPage().getExtendedClientDetails();
         deviceType = detectDeviceType(details, tabletMinShortSidePx);
         var page = attachEvent.getUI().getPage();
