@@ -243,12 +243,16 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         return node;
     }
 
-    private static NativeButton navItem(String title, Icon icon, Class<? extends Component> viewClass) {
+    private NativeButton navItem(String title, Icon icon, Class<? extends Component> viewClass) {
         icon.setSize("20px");
 
         var titleSpan = new Span(title);
         titleSpan.addClassNames(LumoUtility.FontSize.XXSMALL, LumoUtility.FontWeight.BOLD,
                 LumoUtility.TextOverflow.ELLIPSIS);
+        // align-items:center below (needed to center the icon) doesn't stretch this span to the
+        // item's width, so without this the ellipsis class above never has anything to actually
+        // shrink against — it would just overflow instead of truncating.
+        titleSpan.getStyle().set("max-width", "100%");
 
         var item = new NativeButton();
         item.add(icon, titleSpan);
@@ -257,6 +261,22 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
                 LumoUtility.FlexDirection.COLUMN,
                 LumoUtility.AlignItems.CENTER,
                 LumoUtility.TextColor.SECONDARY);
+
+        // min-width:0 overrides the flex-item default (min-width:auto, which pins the shrink
+        // floor to the label's un-wrapped width) so an item can actually shrink below its own
+        // natural content width and the ellipsis above can engage instead of forcing the bar (row)
+        // or the rail (column, via its own cross-axis stretch) wider than intended. Needed in both
+        // directions: MIN_SLOT_PX only ever decided *whether* to show "More"/how many rail icons
+        // fit, never enforced a real per-item width ceiling on rendering — a long label (e.g.
+        // "Analytics") could otherwise push a row past its right edge, or push the rail wider
+        // than its own explicit CSS width (which then throws off vaadin-app-layout's own
+        // measurement-based sizing of the header, since it accounts for the rail's *rendered*,
+        // not intended, width).
+        item.getStyle().set("min-width", "0");
+        if (direction == FlexLayout.FlexDirection.ROW) {
+            // Equal-width, shrinkable items instead of each item's own natural width — see above.
+            item.getStyle().set("flex", "1 1 0");
+        }
 
         if (viewClass != null) {
             item.addClickListener(unused -> UI.getCurrent().navigate(viewClass));

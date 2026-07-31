@@ -13,6 +13,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
@@ -210,6 +212,32 @@ class AppNavLayoutIT {
         assertThat(page.locator(".touch-nav-item")).hasCount(3);
         assertThat(page.locator(".touch-nav-item vaadin-icon")).hasCount(3);
         pauseForHumanIfHeaded();
+    }
+
+    @Test
+    void touchNavItemsShareBarWidthEquallyInsteadOfClipping() {
+        // Regression test: touch-nav-item width used to be purely content-driven (icon + label,
+        // space-evenly distributing only the leftover slack) — nothing shrank a label below its
+        // natural nowrap width, so item widths varied with label length, and with enough items
+        // or long enough labels the row could overflow past the bar's right edge with nothing to
+        // shrink or scroll it back (MIN_SLOT_PX only decides *whether* to show "More", it isn't
+        // enforced on rendering). Items must now be equal-width, shrinkable flex children instead,
+        // which by construction can never sum past the bar's width regardless of label length.
+        newPhonePage();
+        navigateTo("/");
+        pauseForHumanIfHeaded();
+
+        @SuppressWarnings("unchecked")
+        var rawWidths = (List<Object>) page.evaluate(
+                "() => Array.from(document.querySelectorAll('.touch-nav-item'))"
+                        + ".map(e => e.getBoundingClientRect().width)");
+        var widths = rawWidths.stream().mapToDouble(w -> ((Number) w).doubleValue()).toArray();
+
+        assertEquals(3, widths.length, "expected the 3 root sections as primary touch-nav items");
+        var min = Arrays.stream(widths).min().orElseThrow();
+        var max = Arrays.stream(widths).max().orElseThrow();
+        assertEquals(min, max, 1.0,
+                "touch-nav-items must share the bar's width equally, not size to their own label");
     }
 
     @Test
