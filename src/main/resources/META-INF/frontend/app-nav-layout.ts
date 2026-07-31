@@ -38,6 +38,17 @@ GLOBAL_STYLES.replaceSync(`
         min-height: 100dvh;
     }
 
+    /* Lumo's own app-layout theme sets padding-top: var(--safe-area-inset-top) on the generic
+       [part~='navbar'] selector — correct for navbar-top, which sits behind the status bar/
+       notch — but its own navbar-bottom override never resets padding-top back down. Since
+       navbar-bottom also carries the "navbar" part token, the bottom bar inherits the TOP
+       bar's safe-area inset as its own top padding, inflating its height for no reason (the
+       bottom bar's top edge isn't behind anything unsafe). Applies to the ordinary touch bar
+       too, not just the rail — this isn't nav-rail-scoped. */
+    vaadin-app-layout::part(navbar-bottom) {
+        padding-top: var(--vaadin-app-layout-navbar-padding-top, var(--vaadin-padding-s));
+    }
+
     /* Force overlay drawer mode on rail devices (portrait tablet exceeds the 800px media query). */
     vaadin-app-layout[nav-rail] {
         --vaadin-app-layout-drawer-overlay: true;

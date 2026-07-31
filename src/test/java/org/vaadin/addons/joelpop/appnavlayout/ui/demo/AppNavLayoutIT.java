@@ -880,4 +880,40 @@ class AppNavLayoutIT {
         // the 1 remaining primary item and "More" itself carry the touch-nav-item class).
         assertThat(page.locator(".touch-nav-item")).hasCount(2);
     }
+
+    @Test
+    void touchBarTopPaddingOverridesThemesTopSafeAreaInset() {
+        // Regression test: Lumo's own app-layout theme sets padding-top: var(--safe-area-inset-top)
+        // on the generic [part~='navbar'] selector (correct for navbar-top, behind the status
+        // bar/notch), but its navbar-bottom override never resets padding-top back down — so the
+        // bottom bar inherits the TOP bar's safe-area inset as its own top padding, inflating its
+        // height for no reason on any notched device (confirmed via a real iPhone showing an
+        // oversized touch bar: padding-top exactly matched --safe-area-inset-top). This repo's own
+        // demo theme (Aura) doesn't have that specific bug, so reproduce Lumo's exact buggy rule
+        // shape directly inside vaadin-app-layout's shadow root and confirm our external
+        // ::part(navbar-bottom) override still wins over it, the same way it would over Lumo's.
+        newPhonePage();
+        navigateTo("/");
+        pauseForHumanIfHeaded();
+
+        String paddingTopJs = "() => { var bar = document.querySelector('vaadin-app-layout')"
+            + ".shadowRoot.querySelector('[part~=\"navbar-bottom\"]');"
+            + " return getComputedStyle(bar).paddingTop; }";
+        String baselinePaddingTop = (String) page.evaluate(paddingTopJs);
+
+        page.evaluate("""
+            () => {
+                var sheet = new CSSStyleSheet();
+                sheet.replaceSync("[part~='navbar'] { padding-top: var(--safe-area-inset-top); }");
+                var al = document.querySelector('vaadin-app-layout');
+                al.shadowRoot.adoptedStyleSheets = [...al.shadowRoot.adoptedStyleSheets, sheet];
+                document.documentElement.style.setProperty('--safe-area-inset-top', '47px');
+            }
+            """);
+        pauseForHumanIfHeaded();
+
+        String paddingTopWithBuggyTheme = (String) page.evaluate(paddingTopJs);
+        assertEquals(baselinePaddingTop, paddingTopWithBuggyTheme,
+            "external ::part(navbar-bottom) override must win over a theme rule leaking the top bar's safe-area inset");
+    }
 }
