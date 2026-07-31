@@ -33,9 +33,24 @@ GLOBAL_STYLES.replaceSync(`
     }
 
     /* Ensure the layout always fills the viewport so position:fixed elements anchor
-       correctly in iOS PWA mode regardless of whether the html/body height chain is set. */
+       correctly regardless of whether the html/body height chain is set. */
     vaadin-app-layout {
         min-height: 100dvh;
+    }
+
+    /* dvh requires the viewport to be "exercised" via an actual geometry change before it
+       computes correctly on iOS — in standalone (installed-PWA) display mode, WebKit skips
+       that on cold launch, so 100dvh can settle to a different value than window.innerHeight
+       until the first rotation, leaving position:fixed content (e.g. the touch bar) short of
+       the true bottom edge. Confirmed on-device: static vh doesn't have this bug, and
+       standalone mode has no browser toolbar to create the vh-vs-dvh gap dvh exists to solve
+       in the first place, so it's safe to prefer here — verified across cold launch and
+       rotation in both orientations. display-mode can't be simulated in this repo's Playwright
+       IT suite, so this rule is untested there; it's real-device verified only. */
+    @media (display-mode: standalone) {
+        vaadin-app-layout {
+            min-height: 100vh;
+        }
     }
 
     /* Lumo's own app-layout theme sets padding-top: var(--safe-area-inset-top) on the generic
