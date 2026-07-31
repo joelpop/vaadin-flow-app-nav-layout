@@ -122,7 +122,13 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
             if (direction == FlexLayout.FlexDirection.COLUMN) {
                 bar.setSizeFull();
                 bar.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
-                bar.setAlignItems(FlexComponent.Alignment.CENTER);
+                // STRETCH (not CENTER) so items are constrained to the rail's own width instead
+                // of being free to take their own natural (label-length-dependent) width — a
+                // wide label (e.g. "Analytics") could otherwise push an item, and therefore the
+                // whole rail, wider than the rail's own explicit CSS width. Paired with
+                // min-width:0 on each item below (needed because STRETCH still respects
+                // min-width:auto's default shrink floor, same as flex-grow does for the row bar).
+                bar.setAlignItems(FlexComponent.Alignment.STRETCH);
                 bar.addClassName(LumoUtility.Gap.MEDIUM);
             }
             else {

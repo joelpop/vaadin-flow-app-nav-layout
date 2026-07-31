@@ -827,4 +827,26 @@ class AppNavLayoutIT {
         assertThat(page.locator("vaadin-side-nav")).hasCount(1);
         assertThat(page.locator(".touch-nav-item")).hasCount(0);
     }
+
+    @Test
+    void railHeaderFillsAvailableWidthBesideRail() {
+        // Regression test: ::part(navbar-top) is content-box, and AppLayout's default
+        // touch-bar theme applies inline padding meant for the ordinary (non-rail) header
+        // (~12.66px each side) that our nav-rail rule never reset — the same issue already
+        // fixed above for ::part(navbar-bottom). Left unreset, the header's own slotted
+        // content (topBlock, inline width:100%) resolved its percentage against a content
+        // box ~25px narrower than the part's actual rendered width, leaving a gap between
+        // the header and the viewport's right edge that had nothing to do with the rail.
+        newTabletPortraitPage();
+        navigateTo("/");
+        pauseForHumanIfHeaded();
+
+        var navbarTopRect = shadowPartRect("navbar-top");
+        double headerWidth = ((Number) page.evaluate(
+                "() => document.querySelector('.app-top-bar').parentElement.getBoundingClientRect().width"))
+                .doubleValue();
+
+        assertEquals(num(navbarTopRect, "width"), headerWidth, 1.0,
+                "header must fill the full width of its containing navbar-top part beside the rail");
+    }
 }
