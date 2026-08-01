@@ -1,5 +1,7 @@
 package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
+import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
+
 /**
  * Builds and updates the nav-item content for one of {@link AppNavLayout}'s five
  * device/orientation scenarios (desktop, tablet portrait, tablet landscape, phone portrait,
@@ -25,4 +27,16 @@ public interface NavRenderer {
      * drill-down scaffolding it needs (a "More…" popover, a chevron, a swipeable container, etc).
      */
     void render(NavRenderContext context);
+
+    /**
+     * The chrome this renderer requires — determines which {@code NavStrategy} gets built for
+     * whichever scenario this renderer is configured for. Not a free choice: a renderer's
+     * {@link #render} implementation already assumes one specific {@link NavSlots} accessor is
+     * live (e.g. {@link SideRailNavRenderer} only ever populates {@link NavSlots#sideRail()}),
+     * and that slot is only live under the matching {@link NavType}'s strategy. This method makes
+     * that assumption explicit instead of leaving it to silently mismatch — a renderer configured
+     * for a scenario whose resolved chrome doesn't match its own {@code navType()} would otherwise
+     * render into a slot that's never attached to the page, with nothing to indicate why.
+     */
+    NavType navType();
 }

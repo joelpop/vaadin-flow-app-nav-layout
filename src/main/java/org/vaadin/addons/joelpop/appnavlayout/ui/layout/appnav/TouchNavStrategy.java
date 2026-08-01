@@ -10,11 +10,11 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 /**
  * {@link NavStrategy} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#TOUCH} and
  * {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#RAIL}: a bottom/rail nav slot
- * rendered by whichever {@link NavRenderer} {@link AppNavLayout#resolveNavRenderer()} resolves
- * for the current scenario (default: {@link TouchBarNavRenderer}/{@link SideRailNavRenderer}),
- * a shared header-nav slot for drill-down content, plus a drawer split into brand (top) and
- * user (bottom) slots. {@code rail} selects the rail-specific chrome (column layout,
- * fixed-width overlay drawer); otherwise this is the ordinary phone bottom-bar chrome.
+ * rendered by whichever {@link NavRenderer} is active for the current scenario (default:
+ * {@link TouchBarNavRenderer}/{@link SideRailNavRenderer}), a shared header-nav slot for
+ * drill-down content, plus a drawer split into brand (top) and user (bottom) slots.
+ * {@code navType == RAIL} selects the rail-specific chrome (column layout, fixed-width overlay
+ * drawer); {@code TOUCH} is the ordinary phone bottom-bar chrome.
  */
 final class TouchNavStrategy implements NavStrategy {
 
@@ -31,9 +31,9 @@ final class TouchNavStrategy implements NavStrategy {
     // NavSlots accessor without a null check.
     private final Div inertSlot = new Div();
 
-    TouchNavStrategy(AppNavLayout owner, boolean rail) {
+    TouchNavStrategy(AppNavLayout owner, NavType navType) {
         this.owner = owner;
-        this.rail = rail;
+        this.rail = navType == NavType.RAIL;
     }
 
     @Override
@@ -118,7 +118,7 @@ final class TouchNavStrategy implements NavStrategy {
                 ? new NavSlotsImpl(inertSlot, primaryNavSlot, inertSlot, headerNavSlot)
                 : new NavSlotsImpl(inertSlot, inertSlot, primaryNavSlot, headerNavSlot);
         var context = new NavRenderContextImpl(owner.navGrouper, owner.navigationSignal.peek().getPath(), slots);
-        owner.resolveNavRenderer(rail ? NavType.RAIL : NavType.TOUCH).render(context);
+        owner.activeRenderer.render(context);
     }
 
     @Override

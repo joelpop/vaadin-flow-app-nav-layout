@@ -2,6 +2,7 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
+import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.RouteNavUtils;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasComponents;
@@ -95,6 +96,11 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     /** Returns the location this renderer's primary bar belongs in — {@link NavSlots#sideRail()}
      *  or {@link NavSlots#touchBar()}, depending on the concrete subclass. */
     protected abstract HasComponents primarySlot(NavSlots slots);
+
+    @Override
+    public NavType navType() {
+        return direction == FlexLayout.FlexDirection.COLUMN ? NavType.RAIL : NavType.TOUCH;
+    }
 
     @Override
     public void render(NavRenderContext context) {

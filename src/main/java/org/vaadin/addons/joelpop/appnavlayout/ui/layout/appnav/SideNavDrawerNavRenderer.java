@@ -2,6 +2,7 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
+import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 import com.vaadin.flow.component.HasComponents;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
@@ -36,6 +37,11 @@ public class SideNavDrawerNavRenderer implements NavRenderer {
     // render() call.
     void attachOwner(AppNavLayout owner) {
         this.owner = owner;
+    }
+
+    @Override
+    public NavType navType() {
+        return NavType.SIDENAV;
     }
 
     @Override

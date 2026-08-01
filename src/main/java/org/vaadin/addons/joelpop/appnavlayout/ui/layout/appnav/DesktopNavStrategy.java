@@ -1,6 +1,5 @@
 package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
-import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderComponent;
 import org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderTitle;
 import com.vaadin.flow.component.Component;
@@ -13,8 +12,8 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 
 /** {@link NavStrategy} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#SIDENAV}:
  *  header brand/user content, plus a drawer nav slot rendered by whichever {@link NavRenderer}
- *  {@link AppNavLayout#resolveNavRenderer()} resolves for the current scenario (default:
- *  {@link SideNavDrawerNavRenderer}, building a {@link SideNav}). */
+ *  is active for the current scenario (default: {@link SideNavDrawerNavRenderer}, building a
+ *  {@link SideNav}). */
 final class DesktopNavStrategy implements NavStrategy {
 
     private final AppNavLayout owner;
@@ -76,7 +75,7 @@ final class DesktopNavStrategy implements NavStrategy {
     public void populate() {
         var slots = new NavSlotsImpl(drawerNavSlot, inertSlot, inertSlot, inertSlot);
         var context = new NavRenderContextImpl(owner.navGrouper, owner.navigationSignal.peek().getPath(), slots);
-        owner.resolveNavRenderer(NavType.SIDENAV).render(context);
+        owner.activeRenderer.render(context);
     }
 
     @Override

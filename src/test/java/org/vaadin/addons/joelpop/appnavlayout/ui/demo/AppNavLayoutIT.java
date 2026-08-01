@@ -105,6 +105,15 @@ class AppNavLayoutIT {
         return page;
     }
 
+    private Page newTabletLandscapePage() {
+        context.close();
+        context = browser.newContext(new Browser.NewContextOptions()
+                .setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT)
+                .setHasTouch(true));
+        page = context.newPage();
+        return page;
+    }
+
     // ——————————— Navigation helper ————————————
 
     private void navigateTo(String path) {
@@ -149,6 +158,12 @@ class AppNavLayoutIT {
     private boolean hasNavRailAttr() {
         return (boolean) page.evaluate(
             "() => document.querySelector('vaadin-app-layout').hasAttribute('nav-rail')");
+    }
+
+    /** Whether the vaadin-app-layout element has the overlay attribute. */
+    private boolean hasOverlayAttr() {
+        return (boolean) page.evaluate(
+            "() => document.querySelector('vaadin-app-layout').hasAttribute('overlay')");
     }
 
     /** x position of the first view-content element (slotted into the default slot). */
@@ -751,7 +766,7 @@ class AppNavLayoutIT {
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // BLIND SPOTS — overflow popover navigation, HasViewHeaderTitle (desktop),
-    // DrawerToggle, custom NavSelector
+    // DrawerToggle, scenario renderer overriding default chrome
     // ═══════════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -813,13 +828,15 @@ class AppNavLayoutIT {
     }
 
     @Test
-    void customNavSelectorOverridesDefaultDeviceMapping() {
-        // Phone viewport would normally select TOUCH under the default selector, but
-        // AlwaysSidenavLayout's custom NavSelector always returns SIDENAV. This only checks
-        // that the SIDENAV component set (not TOUCH) was built — AppLayout's own responsive
-        // drawer-open/overlay behavior is driven by actual viewport width, independently of
-        // our NavType, so a narrow viewport may still leave the drawer closed by default;
-        // that's a separate concern from which nav-type strategy got selected.
+    void scenarioRendererOverridesDefaultChromeOnPhone() {
+        // Phone would normally get TOUCH chrome by default, but AlwaysSidenavLayout configures
+        // every scenario's renderer to SideNavDrawerNavRenderer, whose navType() is SIDENAV —
+        // proving NavType is correctly derived from whichever renderer is actually configured,
+        // not tied to device/orientation. This only checks that the SIDENAV component set (not
+        // TOUCH) was built — AppLayout's own responsive drawer-open/overlay behavior is driven by
+        // actual viewport width, independently of our NavType, so a narrow viewport may still
+        // leave the drawer closed by default; that's a separate concern from which nav-type
+        // strategy got selected.
         newPhonePage();
         navigateTo("/always-sidenav");
         pauseForHumanIfHeaded();
@@ -915,5 +932,80 @@ class AppNavLayoutIT {
         String paddingTopWithBuggyTheme = (String) page.evaluate(paddingTopJs);
         assertEquals(baselinePaddingTop, paddingTopWithBuggyTheme,
             "external ::part(navbar-bottom) override must win over a theme rule leaking the top bar's safe-area inset");
+    }
+
+    @Test
+    void sharedRailRendererActivatesRailInBothTabletOrientations() {
+        // Regression test for a real-world report: setTabletNavRenderer(SideRailNavRenderer::new)
+        // shares one renderer instance across both tablet orientations. Before NavType was
+        // derived from the active renderer, tablet landscape still defaulted to NavType.SIDENAV
+        // (the drawer) regardless — the shared, rail-only renderer silently rendered into
+        // DesktopNavStrategy's inert placeholder slot, never attached to the page. Cold-launching
+        // directly in landscape (not landscape-via-rotation-from-portrait) matters: that's
+        // exactly how the report reproduced.
+        newTabletLandscapePage();
+        navigateTo("/shared-rail");
+        pauseForHumanIfHeaded();
+        assertTrue(hasNavRailAttr(), "nav-rail must be set on cold landscape launch with a shared rail renderer");
+        assertThat(page.locator(".touch-nav-item").first()).isVisible();
+
+        page.setViewportSize(TABLET_PORTRAIT_WIDTH, TABLET_PORTRAIT_HEIGHT);
+        page.waitForFunction(
+            "() => document.querySelector('vaadin-app-layout').hasAttribute('nav-rail')",
+            null, new Page.WaitForFunctionOptions().setTimeout(3000));
+        assertTrue(hasNavRailAttr(), "nav-rail must remain set in portrait");
+
+        page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
+        page.waitForTimeout(500);
+        assertTrue(hasNavRailAttr(), "nav-rail must still be set after rotating back to landscape");
+        assertThat(page.locator(".touch-nav-item").first()).isVisible();
+        pauseForHumanIfHeaded();
+    }
+
+    @Test
+    void overlayClearsAfterRotatingOutOfRailMode() {
+        // Regression test: the MutationObserver in app-nav-layout.ts that fires a synthetic
+        // resize on nav-rail attribute changes only fired when the attribute was *added*, never
+        // on removal — so AppLayout's own overlay mode, forced true for rail, never got
+        // re-evaluated after leaving rail (portrait→landscape), leaving the drawer stuck in
+        // overlay mode at zero width.
+        newTabletPortraitPage();
+        navigateTo("/");
+        assertTrue(hasNavRailAttr(), "nav-rail must be set in portrait (RAIL)");
+
+        page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
+        page.waitForFunction(
+            "() => !document.querySelector('vaadin-app-layout').hasAttribute('nav-rail')",
+            null, new Page.WaitForFunctionOptions().setTimeout(3000));
+        pauseForHumanIfHeaded();
+
+        assertFalse(hasOverlayAttr(), "overlay must clear after rotating out of rail mode into SIDENAV");
+    }
+
+    @Test
+    void railRenderedWidthMatchesNavRailWidthVariable() {
+        // Regression test for a real-world (iOS/WebKit) report: routed content rendered a few
+        // pixels *under* the rail's true right edge. Root cause: navbar-bottom's content-box
+        // sizing let AppLayout's own touch-optimized theme's inline padding (9px each side) stack
+        // on top of the declared width, plus this part's own 1px border-inline-end — measured on
+        // device at 80+9+9+1=99px rendered, while content's own offset (padding-inline-start on
+        // the host) used the nominal --nav-rail-width (80px), landing content 19px short of the
+        // rail's true edge. Fixed with !important (so this rule's own padding-inline:0 actually
+        // wins that cascade fight) and border-box (so border stops stacking on top of width too).
+        //
+        // This assertion doesn't reproduce the original bug in this Chromium-based suite — a plain
+        // (non-!important) padding-inline:0 already wins the cascade here, unlike in WebKit, so this
+        // test passes even with the fix reverted. Kept anyway as a general correctness invariant
+        // (content must never start left of the rail's rendered edge), not as WebKit-bug coverage;
+        // real-device verification is the only check that actually exercises the original failure.
+        newTabletLandscapePage();
+        navigateTo("/shared-rail");
+
+        var railRect = shadowPartRect("navbar-bottom");
+        double railRight = num(railRect, "x") + num(railRect, "width");
+        double contentX = viewContentX();
+
+        assertTrue(contentX >= railRight,
+            "content (x=" + contentX + ") must not start left of the rail's true right edge (x=" + railRight + ")");
     }
 }

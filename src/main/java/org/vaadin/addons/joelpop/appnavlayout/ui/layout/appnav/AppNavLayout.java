@@ -3,7 +3,6 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.DeviceType;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
-import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavSelector;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.Orientation;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGroup;
@@ -48,26 +47,26 @@ import java.util.function.Supplier;
  * with a secondary tab bar on phone, a permanent left-strip rail on portrait
  * tablet, and a drawer-based {@link SideNav} on desktop.
  *
- * <p>Subclass, supply title and nav selector via {@code super(...)}, and
- * annotate with {@link com.vaadin.flow.router.Layout}. The {@link DrawerToggle} and drawer
- * are wired automatically; the nav-item content for each of the five device/orientation
- * scenarios this layout distinguishes — desktop, tablet portrait, tablet landscape, phone
- * portrait, and phone landscape — is built by an independently pluggable {@link NavRenderer},
- * supplied lazily since only one scenario is ever relevant to a given session.
+ * <p>Subclass, supply a title via {@code super(...)}, and annotate with
+ * {@link com.vaadin.flow.router.Layout}. The {@link DrawerToggle} and drawer are wired
+ * automatically; the nav-item content for each of the five device/orientation scenarios
+ * this layout distinguishes — desktop, tablet portrait, tablet landscape, phone portrait, and
+ * phone landscape — is built by an independently pluggable {@link NavRenderer}, supplied
+ * lazily since only one scenario is ever relevant to a given session.
  * See {@link #setDesktopNavRenderer}, {@link #setTabletPortraitNavRenderer},
  * {@link #setTabletLandscapeNavRenderer}, {@link #setPhonePortraitNavRenderer}, and
  * {@link #setPhoneLandscapeNavRenderer} (plus the {@link #setTabletNavRenderer}/
  * {@link #setPhoneNavRenderer} convenience setters covering both orientations at once),
  * defaulting to {@link SideNavDrawerNavRenderer} (desktop, tablet landscape),
  * {@link SideRailNavRenderer} (tablet portrait), and {@link TouchBarNavRenderer} (phone,
- * both orientations) respectively. This is independent of, and unaffected by, which
- * {@link NavType} chrome a scenario resolves to via {@link NavSelector} — that still governs
- * layout mechanics (rail vs. bottom bar vs. drawer); the per-scenario renderer governs only
- * what's built inside it.
+ * both orientations) respectively. The {@link NavType} chrome built for a scenario (rail vs.
+ * bottom bar vs. drawer) is not a separate choice — it's {@link NavRenderer#navType()} of
+ * whichever renderer is configured for that scenario, so a scenario's renderer and its chrome
+ * can never disagree with each other.
  *
- * <p>The {@link NavSelector} is re-evaluated dynamically on touch devices
- * whenever the viewport size changes (rotation, split-screen resize), switching
- * nav components in place without a page reload.
+ * <p>The active scenario is re-evaluated dynamically on touch devices whenever the viewport
+ * size changes (rotation, split-screen resize), switching nav components in place without a
+ * page reload.
  *
  * <p>Use the purpose-named methods to place adaptive content:
  * <ul>
@@ -102,14 +101,11 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private static final int DEFAULT_TABLET_MIN_SHORT_SIDE_PX = 768;
 
     private String appTitle = "";
-    // ValueSignal (not a plain field) so the window-resize Signal.effect in onAttach() can track
-    // it as a dependency and react automatically when setNavSelector() changes it.
-    private final ValueSignal<NavSelector> navSelectorSignal = new ValueSignal<>(NavSelector.defaultSelector());
     private int tabletMinShortSidePx = DEFAULT_TABLET_MIN_SHORT_SIDE_PX;
     private DeviceType deviceType;
     // Tracked alongside deviceType (not just computed ad hoc inside the resize effect) so
-    // resolveNavRenderer() can resolve the active scenario at any time, not only at the moment
-    // the effect fires.
+    // resolveScenarioRenderer() can resolve the active scenario at any time, not only at the
+    // moment the effect fires.
     private Orientation orientation;
 
     // Always-present layout containers
@@ -118,6 +114,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     private NavType activeNavType;
     private NavStrategy activeStrategy;
+    // The renderer instance currently active for this session — set by applyNavType(), read
+    // directly by NavStrategy.populate() implementations (same package-private field-access
+    // pattern as topBar/navGrouper below). Also the identity applyNavType() guards its rebuild
+    // decision on: two scenarios can share a NavType while resolving to different renderer
+    // instances (e.g. two different SIDENAV-based renderers for tablet portrait vs. landscape),
+    // so the guard can't key on NavType alone.
+    NavRenderer activeRenderer;
 
     // Buffered brand/user content — survives nav-type switches
     final List<Component> bufferedBrandContent = new ArrayList<>();
@@ -174,9 +177,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private NavState navState = NavState.UNBUILT;
 
     /**
-     * Creates an {@code AppNavLayout} with an empty app title and the
-     * {@link NavSelector#defaultSelector() default nav selector} (phone → touch,
-     * tablet-portrait → rail, tablet-landscape/desktop → sidenav).
+     * Creates an {@code AppNavLayout} with an empty app title and the default renderers
+     * for each scenario (phone → touch, tablet-portrait → rail, tablet-landscape/desktop →
+     * sidenav).
      */
     protected AppNavLayout() {
         super.setPrimarySection(Section.DRAWER);
@@ -211,8 +214,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     /**
-     * Creates an {@code AppNavLayout} with the given app title and the
-     * {@link NavSelector#defaultSelector() default nav selector}.
+     * Creates an {@code AppNavLayout} with the given app title and the default renderers
+     * for each scenario.
      *
      * @param appTitle text displayed in the navigation bar; pass an empty string for no title
      */
@@ -221,33 +224,27 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         this.appTitle = appTitle;
     }
 
-    /**
-     * Creates an {@code AppNavLayout} with the given app title and nav selector.
-     *
-     * @param appTitle    text displayed in the navigation bar; pass an empty string for no title
-     * @param navSelector strategy that maps {@link DeviceType} and {@link Orientation} to a
-     *                    {@link NavType}; use {@link NavSelector#defaultSelector()} for the
-     *                    standard phone/tablet/desktop mapping
-     */
-    protected AppNavLayout(String appTitle, NavSelector navSelector) {
-        this(appTitle);
-        navSelectorSignal.set(navSelector);
-    }
-
     // ——————————— Nav-type switching ————————————
 
     /**
-     * Orchestrates a full nav-type rebuild. No-ops if {@code navType} matches the
-     * already-{@link NavState#POPULATED} active nav type. Otherwise tears down the previous
-     * {@link NavStrategy} (if one was built), creates the strategy for {@code navType}, then
-     * runs it through the rebuild sequence: {@link #buildNav()} (structural components) →
+     * Resolves the {@link NavRenderer} for the current {@link DeviceType}/{@link Orientation}
+     * scenario, then applies it. No-ops if the resolved renderer is identical (by reference) to
+     * the already-{@link NavState#POPULATED} {@link #activeRenderer} — deliberately keyed on
+     * renderer identity, not {@link NavType}, since two scenarios can share a NavType while
+     * resolving to different renderer instances (e.g. two different SIDENAV-based renderers for
+     * tablet portrait vs. landscape); a NavType-keyed guard would silently skip the rebuild those
+     * need. Otherwise tears down the previous {@link NavStrategy} (if one was built), creates the
+     * strategy for the renderer's {@link NavRenderer#navType() navType()}, then runs it through
+     * the rebuild sequence: {@link #buildNav()} (structural components) →
      * {@link #placeBrandAndUserContent()} (buffered brand/user content) → {@link #populateNav()}
      * (nav items from the current {@link NavGrouper}, reaching {@link NavState#POPULATED}) →
      * {@link #rebuildViewHeader} (view header for the current view). Fires
-     * {@link NavTypeChangedEvent} last, once the new nav type is fully in place.
+     * {@link NavTypeChangedEvent} last, once the new nav type is fully in place — note its
+     * {@code navType}/{@code previousNavType} can be equal on a renderer-only rebuild.
      */
-    private void applyNavType(NavType navType) {
-        if (navState == NavState.POPULATED && navType == this.activeNavType) {
+    private void applyNavType() {
+        var renderer = resolveScenarioRenderer();
+        if (navState == NavState.POPULATED && renderer == this.activeRenderer) {
             return;
         }
 
@@ -256,11 +253,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             navState = NavState.UNBUILT;
         }
 
+        var navType = renderer.navType();
         var previousNavType = this.activeNavType;
+        this.activeRenderer = renderer;
         this.activeNavType = navType;
         activeStrategy = (navType == NavType.SIDENAV)
                 ? new DesktopNavStrategy(this)
-                : new TouchNavStrategy(this, navType == NavType.RAIL);
+                : new TouchNavStrategy(this, navType);
         buildNav();
         navState = NavState.BUILT;
         placeBrandAndUserContent();
@@ -316,16 +315,13 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         var details = attachEvent.getUI().getPage().getExtendedClientDetails();
         deviceType = detectDeviceType(details, tabletMinShortSidePx);
         var page = attachEvent.getUI().getPage();
-        // Registered with no direct applyNavType()
-        // call beforehand: this effect's own immediate first fire performs the initial apply for
-        // every device type. navSelectorSignal is a tracked dependency, so setNavSelector() later
-        // re-fires this automatically — no manual re-registration needed.
+        // Registered with no direct applyNavType() call beforehand: this effect's own immediate
+        // first fire performs the initial apply for every device type.
         Signal.effect(this, () -> {
-            var selector = navSelectorSignal.get();
             var size = page.windowSizeSignal().get();
             orientation = size.width() >= size.height()
                     ? Orientation.LANDSCAPE : Orientation.PORTRAIT;
-            applyNavType(selector.select(deviceType, orientation));
+            applyNavType();
         });
     }
 
@@ -442,9 +438,10 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      * Overrides the {@link NavRenderer} used for both tablet orientations at once, sharing a
      * single memoized instance between them — equivalent to calling
      * {@link #setTabletPortraitNavRenderer} and {@link #setTabletLandscapeNavRenderer} with a
-     * shared supplier, not two independent ones. Only sensible if {@code renderer} is written to
-     * work with whichever of {@link NavSlots#sideRail()}/{@link NavSlots#drawer()} is actually
-     * live — the built-in defaults are not, each being hardcoded to one.
+     * shared supplier, not two independent ones. Both orientations resolve their chrome from
+     * {@code renderer}'s own {@link NavRenderer#navType() navType()}, so e.g. supplying
+     * {@link SideRailNavRenderer} correctly gives both orientations rail chrome — the same way
+     * phone already gives both orientations touch-bar chrome by default.
      */
     protected void setTabletNavRenderer(Supplier<NavRenderer> renderer) {
         var shared = memoize(renderer);
@@ -532,32 +529,30 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     /**
-     * Resolves the {@link NavRenderer} to use for the given {@code navType} — the chrome a
-     * {@code NavStrategy} is already built for — preferring the renderer for the current
-     * {@link DeviceType}/{@link Orientation} scenario when it naturally corresponds to
-     * {@code navType}, and otherwise falling back to whichever scenario is the representative
-     * default for that chrome. The fallback matters when a custom {@link NavSelector} routes a
-     * scenario to a {@link NavType} it doesn't default to (e.g. always {@code SIDENAV}
-     * regardless of device) — the five scenario fields alone don't cover every
-     * (scenario, {@code NavType}) combination, only each scenario's own default one.
+     * Resolves the {@link NavRenderer} configured for the current {@link DeviceType}/
+     * {@link Orientation} scenario — a direct mapping, independent of {@link NavType}: which
+     * chrome that renderer requires is derived from it afterwards, via
+     * {@link NavRenderer#navType()}, not chosen separately.
      */
-    NavRenderer resolveNavRenderer(NavType navType) {
-        return switch (navType) {
-            case SIDENAV -> (deviceType == DeviceType.TABLET ? tabletLandscapeNavRenderer : desktopNavRenderer).get();
-            case RAIL -> tabletPortraitNavRenderer.get();
-            case TOUCH -> (orientation == Orientation.LANDSCAPE ? phoneLandscapeNavRenderer : phonePortraitNavRenderer).get();
+    private NavRenderer resolveScenarioRenderer() {
+        return switch (deviceType) {
+            case DESKTOP -> desktopNavRenderer.get();
+            case TABLET -> (orientation == Orientation.LANDSCAPE ? tabletLandscapeNavRenderer : tabletPortraitNavRenderer).get();
+            case PHONE -> (orientation == Orientation.LANDSCAPE ? phoneLandscapeNavRenderer : phonePortraitNavRenderer).get();
         };
     }
 
     /**
-     * Forces a full tear-down/rebuild of the active nav type even though it hasn't changed —
-     * unlike {@link #repopulateNav()}, needed when a renderer setter swaps out the component a
-     * location is built from, not just how it's populated.
+     * Re-evaluates the active scenario's renderer after a renderer setter call — unlike
+     * {@link #repopulateNav()}, needed when a setter swaps out the component a location is built
+     * from, not just how it's populated. Delegates to {@link #applyNavType()}'s own
+     * renderer-identity guard rather than forcing a rebuild unconditionally: a setter call that
+     * affected a scenario other than the currently-active one resolves to the same active
+     * renderer instance and correctly no-ops.
      */
     private void forceRebuildNav() {
         if (navState != NavState.UNBUILT) {
-            navState = NavState.BUILT;
-            applyNavType(activeNavType);
+            applyNavType();
         }
     }
 
@@ -717,23 +712,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             var details = ui.getPage().getExtendedClientDetails();
             deviceType = detectDeviceType(details, tabletMinShortSidePx);
             orientation = detectOrientation(details);
-            applyNavType(navSelectorSignal.get().select(deviceType, orientation));
+            applyNavType();
         });
-        return this;
-    }
-
-    /**
-     * Overrides the strategy used to select the {@link NavType} for a given
-     * device type and orientation. Default: {@link NavSelector#defaultSelector()}.
-     *
-     * <p>If the layout is already attached, the nav type is re-evaluated and
-     * re-applied immediately via the window-resize effect registered in
-     * {@link #onAttach}, which tracks this signal as a dependency.
-     *
-     * @return this, for chaining
-     */
-    public AppNavLayout setNavSelector(NavSelector selector) {
-        navSelectorSignal.set(selector);
         return this;
     }
 

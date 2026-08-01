@@ -79,18 +79,26 @@ GLOBAL_STYLES.replaceSync(`
         inset-block-start: 0;
         inset-block-end: 0;
         inset-inline-start: 0;
-        width: var(--nav-rail-width, 5rem);
         z-index: 200;
         will-change: auto;
         padding-block-start: var(--lumo-space-s);
         padding-block-end: 0;
-        /* This part's box-sizing is content-box, and AppLayout's own default touch-bar theme
-           applies inline padding meant for the ordinary bottom bar (~12.66px each side) — left
-           unreset, that padding adds on top of the width above (measured rendering 80px + 25.3px
-           = 105.3px instead of 80px), which then throws off AppLayout's own internal navbar-top
-           width calculation (it accounts for this part's actual rendered width). The rail has no
-           use for that inset; the items inside size themselves. */
-        padding-inline: 0;
+        /* --nav-rail-width is also what padding-inline-start on the host (below) uses to push
+           routed content clear of the rail — that only lands correctly if this part's true
+           rendered width is exactly --nav-rail-width, not merely its declared content width.
+           box-sizing defaults to content-box, under which padding/border stack on top of the
+           declared width; AppLayout's own touch-optimized theme applies 9px of its own inline
+           padding to this part (meant for the ordinary horizontal bottom bar) with the same
+           specificity as this rule, and can be (re)adopted after it, so a plain "padding-inline: 0"
+           here silently loses that fight — confirmed by measuring the rendered part at 99px
+           (80 + 9 + 9 + this rule's own 1px border-inline-end) despite this rule "resetting" the
+           padding. Two fixes, not one: !important actually wins the padding fight, and border-box
+           (so border no longer stacks on top of the declared width either) makes the two numbers
+           equal by construction instead of by arithmetic that has to be re-verified by hand every
+           time either side changes. */
+        box-sizing: border-box !important;
+        width: var(--nav-rail-width, 5rem);
+        padding-inline: 0 !important;
         background: var(--lumo-contrast-5pct);
         border-inline-end: 1px solid var(--lumo-contrast-10pct);
     }
@@ -148,17 +156,15 @@ document.adoptedStyleSheets = [...document.adoptedStyleSheets, GLOBAL_STYLES];
 
 // vaadin-app-layout evaluates --vaadin-app-layout-drawer-overlay inside its
 // window 'resize' handler (_resize → _updateOverlayMode). It does NOT watch
-// element-level resize — only window resize. So whenever nav-rail is added
-// (initial attach or orientation-driven rebuild), fire a synthetic window
-// resize so AppLayout re-evaluates the variable now that both the nav-rail
-// attribute and our CSS rule are live.
-new MutationObserver(mutations => {
-    for (const mutation of mutations) {
-        if ((mutation.target as HTMLElement).hasAttribute('nav-rail')) {
-            requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
-            break;
-        }
-    }
+// element-level resize — only window resize. So whenever nav-rail changes
+// (added on initial attach/orientation-driven rebuild into rail, or removed on
+// leaving it), fire a synthetic window resize so AppLayout re-evaluates the
+// variable now that both the nav-rail attribute and our CSS rule are settled.
+// Must cover removal too, not just addition: leaving rail mode also removes
+// --vaadin-app-layout-drawer-overlay, and without a resize nudge afterward,
+// AppLayout's own overlay state never gets re-evaluated and stays stuck true.
+new MutationObserver(() => {
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
 }).observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['nav-rail'],
