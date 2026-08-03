@@ -21,7 +21,7 @@ public interface NavRenderer {
 
     /**
      * Builds or updates this renderer's content for the current nav state. Called once when
-     * this location becomes active, again on every completed navigation, and again whenever nav
+     * this scenario becomes active, again on every completed navigation, and again whenever nav
      * configuration changes (grouper swap, path matcher change). The implementation decides
      * which slot(s) in {@code context.slots()} to populate and how — including any overflow or
      * drill-down scaffolding it needs (a "More…" popover, a chevron, a swipeable container, etc).

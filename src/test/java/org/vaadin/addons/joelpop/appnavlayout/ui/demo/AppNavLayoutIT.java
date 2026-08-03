@@ -148,6 +148,16 @@ class AppNavLayoutIT {
         return ((Number) rect.get(key)).doubleValue();
     }
 
+    /** parseFloat of a computed style property of a named shadow-DOM part of vaadin-app-layout. */
+    private double shadowPartComputedPx(String part, String cssProperty) {
+        return ((Number) page.evaluate("""
+            ([part, prop]) => {
+                const el = document.querySelector('vaadin-app-layout')
+                    .shadowRoot.querySelector('[part~="' + part + '"]');
+                return parseFloat(getComputedStyle(el)[prop]);
+            }""", List.of(part, cssProperty))).doubleValue();
+    }
+
     /** y position of the .app-top-bar element (topBar HorizontalLayout). */
     private double topBarY() {
         var box = page.locator(".app-top-bar").boundingBox();
@@ -1007,5 +1017,65 @@ class AppNavLayoutIT {
 
         assertTrue(contentX >= railRight,
             "content (x=" + contentX + ") must not start left of the rail's true right edge (x=" + railRight + ")");
+    }
+
+    @Test
+    void navbarTopPaddingInlineIsFullyResetInRailMode() {
+        // Companion regression test to railRenderedWidthMatchesNavRailWidthVariable above: found
+        // by source inspection (no new real-world report) that navbar-top matches the exact same
+        // AppLayout-internal [part~='navbar'] rule as navbar-bottom, at the same specificity, so
+        // it's subject to the identical WebKit cascade fight over padding-inline. Fixed the same
+        // way — !important on this rule's own padding-inline:0 — before any real-device symptom
+        // was reported for the header specifically.
+        //
+        // Like the navbar-bottom test, this doesn't reproduce the original WebKit-only failure in
+        // this Chromium-based suite (a plain, non-!important override already wins here), so it
+        // passes even with the fix reverted. Kept as a general correctness invariant.
+        newTabletLandscapePage();
+        navigateTo("/shared-rail");
+
+        assertEquals(0, shadowPartComputedPx("navbar-top", "paddingInlineStart"),
+            "navbar-top's own padding-inline-start must be fully reset to 0 in rail mode");
+        assertEquals(0, shadowPartComputedPx("navbar-top", "paddingInlineEnd"),
+            "navbar-top's own padding-inline-end must be fully reset to 0 in rail mode");
+    }
+
+    @Test
+    void navbarOffsetBottomStaysZeroInRailModeRegardlessOfOtherStylesheets() {
+        // Regression test for a real-world report: an app combining this layout's rail mode with
+        // a second, unrelated add-on that also styles vaadin-app-layout's navbar-top/navbar-bottom
+        // parts saw its entire routed content area collapse to a ~32px sliver on tablet portrait.
+        //
+        // Root cause: AppLayout's own _updateOffsetSize() measures navbar-bottom's rendered height
+        // and republishes it as --vaadin-app-layout-navbar-offset-bottom, which the base app-layout
+        // styles apply directly as the *host's* own padding-bottom. In rail mode navbar-bottom is a
+        // fixed, full-viewport-height strip (inset-block-start/end: 0), so that "bar height" is the
+        // entire viewport — normally masked by an unrelated cascade tie elsewhere (confirmed earlier
+        // this session: the bogus value propagates but never reached the host's rendered
+        // padding-bottom in this suite's own plain demo, which keeps a small, unrelated, legitimate
+        // padding-bottom of its own from a completely different source). Introducing a second
+        // stylesheet that also touches these parts can tip that tie and let the bogus value actually
+        // land, live-confirmed against a real app: host padding-bottom computed to the full viewport
+        // height (1180px on an 1180px-tall viewport) with such a stylesheet present, squeezing
+        // content to ~32px.
+        //
+        // Fixed by unconditionally zeroing --vaadin-app-layout-navbar-offset-bottom in rail mode
+        // with !important — a fix that doesn't depend on which stylesheet wins any tie, so this
+        // assertion holds regardless of what else is loaded on the page. Asserting on the variable
+        // itself, not on the host's overall padding-bottom, since that overall value legitimately
+        // includes other, unrelated small contributions this fix has no reason to zero out. This
+        // suite can't add a second real add-on to reproduce the exact trigger, but the fix's
+        // guarantee (the variable is always 0 in rail mode, full stop) is directly and fully
+        // testable without it.
+        newTabletPortraitPage();
+        navigateTo("/shared-rail");
+
+        String offsetBottomVar = (String) page.evaluate(
+            "() => getComputedStyle(document.querySelector('vaadin-app-layout'))"
+            + ".getPropertyValue('--vaadin-app-layout-navbar-offset-bottom')");
+
+        assertEquals("0px", offsetBottomVar.trim(),
+            "--vaadin-app-layout-navbar-offset-bottom must be zeroed in rail mode, not left holding "
+                + "navbar-bottom's stretched-to-viewport rendered height for some later cascade tie to leak");
     }
 }

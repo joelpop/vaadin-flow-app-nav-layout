@@ -1,6 +1,6 @@
 # vaadin-flow-app-nav-layout
 
-`AppNavLayout` is a Vaadin Flow base layout that automatically builds your application's navigation menuing system derived from annotations on your views. It adapts its navigation to the device: a bottom touch bar on phones, a side rail on tablets, a `SideNav` drawer on desktop. Building them by hand usually means maintaining three separate navigation components in sync with your routes, updated one by one whenever a view is added, moved, or renamed. `AppNavLayout` derives all three from the same `@Route`/`@Menu` metadata your views already declare, and switches between them live as the viewport changes — one navigation model, no per-device wiring to maintain.
+`AppNavLayout` is a Vaadin Flow base layout that automatically builds your application's navigation menuing system derived from annotations on your views. It adapts its navigation to the device and orientation: a bottom touch bar on phones, a side rail on portrait tablets, a `SideNav` drawer on desktop and landscape tablets. Building them by hand usually means maintaining three separate navigation components in sync with your routes, updated one by one whenever a view is added, moved, or renamed. `AppNavLayout` derives all three from the same `@Route`/`@Menu` metadata your views already declare, and switches between them live as the viewport changes — one navigation model, no per-device wiring to maintain.
 
 ## Table of Contents
 
@@ -220,7 +220,7 @@ Lifecycle hooks and events:
 |---|---|
 | `onNavTypeChanged(NavTypeChangedEvent event)` | Protected, no-op by default. Override to react to nav-type determination, including the first attachment. |
 | `addNavTypeChangedListener(ComponentEventListener<NavTypeChangedEvent>)` | Public, returns a `Registration`. For non-subclass consumers of the same event. |
-| `afterNavigation(AfterNavigationEvent event)` | Public, from `AfterNavigationObserver`. Rebuilds the adaptive view header from the current view's `HasViewHeaderTitle`/`HasViewHeaderComponent`. |
+| `afterNavigation(AfterNavigationEvent event)` | Public, from `AfterNavigationObserver`. Rebuilds the adaptive view header from the current view's `HasViewHeaderTitle`/`HasViewHeaderComponent`, and re-invokes the active `NavRenderer`(s) so active-item highlighting and drill-down content stay current. |
 
 Accessors and escape hatch:
 

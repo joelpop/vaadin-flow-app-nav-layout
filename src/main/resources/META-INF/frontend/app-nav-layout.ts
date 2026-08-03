@@ -64,15 +64,34 @@ GLOBAL_STYLES.replaceSync(`
         padding-top: var(--vaadin-app-layout-navbar-padding-top, var(--vaadin-padding-s));
     }
 
-    /* Force overlay drawer mode on rail devices (portrait tablet exceeds the 800px media query). */
+    /* Force overlay drawer mode on rail devices (portrait tablet exceeds the 800px media query).
+
+       Also neutralizes --vaadin-app-layout-navbar-offset-bottom, which AppLayout derives from
+       navbar-bottom's own rendered height (its internal offset-size calculation reads this
+       part's getBoundingClientRect().height) and then applies as the *host's own* padding-bottom.
+       That measurement assumes navbar-bottom is an ordinary horizontal bottom bar; in rail mode
+       it's a fixed, full-viewport-height vertical strip (inset-block-start/end: 0 below), so the
+       "bar height" it reports is the viewport's full height — and once anything else adopts a
+       stylesheet that also touches these parts (any other CSS reaching the same navbar-top/
+       navbar-bottom parts, e.g. a separate scroll-behavior add-on styling the same AppLayout,
+       shifts which stylesheet's rules win adjacent cascade ties), that bogus value can start
+       actually landing as the host's real padding-bottom instead of being incidentally masked —
+       collapsing the entire content area to a sliver, confirmed live: hostPaddingBottom computed
+       to the full viewport height (e.g. 1180px on an 1180px-tall viewport) with such a stylesheet
+       present, squeezing routed content down to a ~32px strip. The rail already reserves its
+       space via padding-inline-start, not padding-bottom, so there's nothing for this to
+       legitimately contribute here regardless of what else is loaded on the page. !important
+       because relying on which stylesheet happens to be adopted last is exactly the failure mode
+       this fixes. */
     vaadin-app-layout[nav-rail] {
         --vaadin-app-layout-drawer-overlay: true;
+        --vaadin-app-layout-navbar-offset-bottom: 0px !important;
     }
 
     /* Rail: pin navbar-bottom slot to the full left edge, top to bottom.
        Starting at 0 (not at navbar-offset-top) means the rail never jumps when
        navigation changes the header height, and a scroll-hiding top bar does
-       not leave a gap above the rail. The companion ::part(navbar) rule below
+       not leave a gap above the rail. The companion ::part(navbar-top) rule below
        keeps the fixed top bar out of the rail's x=0–5rem strip. */
     vaadin-app-layout[nav-rail]::part(navbar-bottom) {
         position: fixed !important;
@@ -112,13 +131,20 @@ GLOBAL_STYLES.replaceSync(`
        part="navbar navbar-bottom"), so ::part(navbar) would match both. Use the more
        specific ::part(navbar-top) to target only the top bar. AppLayout's own
        transition: inset-inline-start remains intact.
-       This part is also content-box with AppLayout's default touch-bar padding
-       (~12.66px each side) left unreset, same as navbar-bottom above. Left in place,
-       the header's own slotted content resolves its width% against a content box
-       that's 25.3px narrower than the space actually available beside the rail. */
+       Same cascade fight as navbar-bottom above, same root cause: this part matches
+       AppLayout's own shadow-DOM-internal [part~='navbar'] rule, which applies 9px of
+       padding-inline via --vaadin-padding-s at the same specificity as this external
+       ::part() override, and can win the tie on WebKit despite this rule "resetting" it
+       — confirmed for navbar-bottom by direct measurement; navbar-top is governed by
+       the identical rule/variable, so !important is needed here for the same reason,
+       not merely for consistency. Left unreset, the header's own slotted content
+       resolves its width% against a content box up to 18px (9px each side) narrower
+       than the space actually available beside the rail. No explicit width/box-sizing
+       fix needed here (unlike navbar-bottom): this part's width comes from two insets,
+       not from a declared width that padding/border could stack on top of. */
     vaadin-app-layout[nav-rail]::part(navbar-top) {
         inset-inline-start: var(--nav-rail-width, 5rem);
-        padding-inline: 0;
+        padding-inline: 0 !important;
     }
 
     /* Reset native <button> defaults so touch-nav-item / overflow-nav-item look like the design. */
