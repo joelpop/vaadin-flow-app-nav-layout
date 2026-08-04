@@ -44,8 +44,8 @@ import java.util.function.Supplier;
 
 /**
  * Base application layout providing adaptive navigation: a bottom icon bar
- * with a secondary tab bar on phone, a permanent left-strip rail on portrait
- * tablet, and a drawer-based {@link SideNav} on desktop.
+ * with a secondary tab bar on phone, a permanent left-strip rail on tablet,
+ * and a drawer-based {@link SideNav} on desktop.
  *
  * <p>Subclass, supply a title via {@code super(...)}, and annotate with
  * {@link com.vaadin.flow.router.Layout}. The {@link DrawerToggle} and drawer are wired
@@ -57,9 +57,9 @@ import java.util.function.Supplier;
  * {@link #setTabletLandscapeNavRenderer}, {@link #setPhonePortraitNavRenderer}, and
  * {@link #setPhoneLandscapeNavRenderer} (plus the {@link #setTabletNavRenderer}/
  * {@link #setPhoneNavRenderer} convenience setters covering both orientations at once),
- * defaulting to {@link SideNavDrawerNavRenderer} (desktop, tablet landscape),
- * {@link SideRailNavRenderer} (tablet portrait), and {@link TouchBarNavRenderer} (phone,
- * both orientations) respectively. The {@link NavType} chrome built for a scenario (rail vs.
+ * defaulting to {@link SideNavDrawerNavRenderer} (desktop), {@link SideRailNavRenderer}
+ * (tablet, both orientations), and {@link TouchBarNavRenderer} (phone, both orientations)
+ * respectively. The {@link NavType} chrome built for a scenario (rail vs.
  * bottom bar vs. drawer) is not a separate choice — it's {@link NavRenderer#navType()} of
  * whichever renderer is configured for that scenario, so a scenario's renderer and its chrome
  * can never disagree with each other.
@@ -149,15 +149,15 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // One independently overridable, lazily-materialized NavRenderer per device/orientation
     // scenario — deliberately NOT keyed by NavType, so a scenario can be given its own renderer
     // even when it currently shares a NavType (and therefore a NavStrategy/chrome) with another
-    // scenario, e.g. desktop and tablet-landscape both resolve to NavType.SIDENAV by default but
-    // are independently configurable here. Only one scenario is ever relevant to a given session
-    // (deviceType is fixed once attached), so each is a memoize()d Supplier — constructed at most
-    // once, on first actual use, rather than eagerly building all five up front. Phone's two
-    // fields deliberately share one memoized Supplier by default (see memoize()'s javadoc for why
-    // that matters, not just for laziness).
+    // scenario, e.g. tablet-portrait and tablet-landscape both resolve to NavType.RAIL by default
+    // but are independently configurable here. Only one scenario is ever relevant to a given
+    // session (deviceType is fixed once attached), so each is a memoize()d Supplier — constructed
+    // at most once, on first actual use, rather than eagerly building all five up front. Both
+    // tablet and phone deliberately share one memoized Supplier across their own two fields by
+    // default (see memoize()'s javadoc for why that matters, not just for laziness).
     Supplier<NavRenderer>                                           desktopNavRenderer         = memoize(SideNavDrawerNavRenderer::new);
     Supplier<NavRenderer>                                           tabletPortraitNavRenderer  = memoize(SideRailNavRenderer::new);
-    Supplier<NavRenderer>                                           tabletLandscapeNavRenderer = memoize(SideNavDrawerNavRenderer::new);
+    Supplier<NavRenderer>                                           tabletLandscapeNavRenderer = tabletPortraitNavRenderer;
     Supplier<NavRenderer>                                           phonePortraitNavRenderer   = memoize(TouchBarNavRenderer::new);
     Supplier<NavRenderer>                                           phoneLandscapeNavRenderer  = phonePortraitNavRenderer;
 
@@ -178,8 +178,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     /**
      * Creates an {@code AppNavLayout} with an empty app title and the default renderers
-     * for each scenario (phone → touch, tablet-portrait → rail, tablet-landscape/desktop →
-     * sidenav).
+     * for each scenario (phone → touch, tablet → rail, desktop → sidenav).
      */
     protected AppNavLayout() {
         super.setPrimarySection(Section.DRAWER);
@@ -424,8 +423,10 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     /**
      * Overrides the {@link NavRenderer} used for the landscape-tablet scenario, constructed at
-     * most once, the first time it's actually needed. Default: {@link SideNavDrawerNavRenderer}
-     * (matching the desktop scenario, since both resolve to {@link NavType#SIDENAV} by default).
+     * most once, the first time it's actually needed. Default: the same memoized
+     * {@link SideRailNavRenderer} instance as the portrait-tablet default (see
+     * {@link #setTabletNavRenderer}) — both resolve to {@link NavType#RAIL} by default and need
+     * no orientation-specific behavior.
      *
      * <p>If this scenario is currently active, it is torn down and rebuilt immediately.
      */
@@ -440,8 +441,9 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      * {@link #setTabletPortraitNavRenderer} and {@link #setTabletLandscapeNavRenderer} with a
      * shared supplier, not two independent ones. Both orientations resolve their chrome from
      * {@code renderer}'s own {@link NavRenderer#navType() navType()}, so e.g. supplying
-     * {@link SideRailNavRenderer} correctly gives both orientations rail chrome — the same way
-     * phone already gives both orientations touch-bar chrome by default.
+     * {@link SideNavDrawerNavRenderer} correctly gives both orientations sidenav chrome — this is
+     * the same sharing relationship both tablet orientations and phone's two orientations already
+     * have by default (see the field comment above), just with an explicit renderer instead.
      */
     protected void setTabletNavRenderer(Supplier<NavRenderer> renderer) {
         var shared = memoize(renderer);

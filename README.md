@@ -1,6 +1,6 @@
 # vaadin-flow-app-nav-layout
 
-`AppNavLayout` is a Vaadin Flow base layout that automatically builds your application's navigation menuing system derived from annotations on your views. It adapts its navigation to the device and orientation: a bottom touch bar on phones, a side rail on portrait tablets, a `SideNav` drawer on desktop and landscape tablets. Building them by hand usually means maintaining three separate navigation components in sync with your routes, updated one by one whenever a view is added, moved, or renamed. `AppNavLayout` derives all three from the same `@Route`/`@Menu` metadata your views already declare, and switches between them live as the viewport changes — one navigation model, no per-device wiring to maintain.
+`AppNavLayout` is a Vaadin Flow base layout that automatically builds your application's navigation menuing system derived from annotations on your views. It adapts its navigation to the device: a bottom touch bar on phones, a side rail on tablets, a `SideNav` drawer on desktop. Building them by hand usually means maintaining three separate navigation components in sync with your routes, updated one by one whenever a view is added, moved, or renamed. `AppNavLayout` derives all three from the same `@Route`/`@Menu` metadata your views already declare, and switches between them live as the viewport changes — one navigation model, no per-device wiring to maintain.
 
 ## Table of Contents
 
@@ -61,7 +61,7 @@ See [Screenshots](#screenshots) for what this produces on each device, and [Cust
 </td>
 <td align="center">
 <img src="README-images/tablet-landscape.png" width="320"><br>
-<sub><b>Tablet, landscape</b> — <code>SIDENAV</code> drawer</sub>
+<sub><b>Tablet, landscape</b> — <code>RAIL</code></sub>
 </td>
 </tr>
 <tr>
@@ -127,10 +127,11 @@ setDesktopNavRenderer(MyCompanySideNavRenderer::new);
 Which chrome gets built for a scenario (rail, bottom bar, or drawer) isn't a separate choice —
 it's derived from whichever renderer is configured, via that renderer's own `navType()`. So
 setting one renderer for both tablet orientations gives both orientations that renderer's
-chrome, the same way phone already gets touch-bar chrome in both orientations by default:
+chrome, the same way phone already gets touch-bar chrome in both orientations by default (and
+tablet already gets rail chrome in both orientations by default):
 
 ```java
-setTabletNavRenderer(SideRailNavRenderer::new); // rail in both tablet orientations
+setTabletNavRenderer(SideNavDrawerNavRenderer::new); // sidenav drawer in both tablet orientations, replacing the rail default
 ```
 
 or subclass one of the built-ins to change just one piece of its behavior — for example, the
@@ -174,70 +175,70 @@ Every public and protected member of the library, for lookup. All `AppNavLayout`
 
 Constructors (protected — called via `super(...)` from a subclass):
 
-| Constructor | Description |
-|---|---|
-| `AppNavLayout()` | Empty app title, default renderers for every scenario. |
+| Constructor                     | Description                                                                    |
+|---------------------------------|--------------------------------------------------------------------------------|
+| `AppNavLayout()`                | Empty app title, default renderers for every scenario.                         |
 | `AppNavLayout(String appTitle)` | Given app title (empty string for none), default renderers for every scenario. |
 
 Configuration setters (protected — call from the subclass constructor or later):
 
-| Method | Default | Description |
-|---|---|---|
-| `addBrandContent(Component...)` | — | Logo/title: header (desktop) or drawer top (mobile). Pass individual components, not pre-wrapped. |
-| `setUserMenu(Component)` | — | User widget: header trailing (desktop) or drawer bottom (mobile). |
-| `setNavPathMatcher(BiPredicate<String, String>)` | `String::equals` | Active-item path matching for touch/rail highlighting only — desktop `SideNav` highlights via Vaadin's own router matching. |
-| `setNavMatchNested(boolean)` | `false` | Whether desktop `SideNavItem`s use `setMatchNested`, so a parent stays highlighted while any child route is active. |
-| `setNavGrouper(NavGrouper)` | `PathPrefixNavGrouper` | Full grouping strategy override. **Severs** the automatic wiring to `setViewNavGroupResolver`/`setViewIconGenerator` — configure a custom grouper directly before passing it here. |
-| `setNavNodeRenderer(ComponentRenderer<SideNavItem, NavNode>)` | built-in | Custom desktop `SideNavItem` renderer. |
-| `setViewNavGroupResolver(Function<MenuEntry, NavGroup>)` | path-based (`null`) | Explicit group assignment for a view; return `null` for path-based grouping. Only takes effect through the default `PathPrefixNavGrouper`. |
-| `setViewIconGenerator(Function<MenuEntry, Supplier<Icon>>)` | no icon | Icon for each leaf nav item. Only takes effect through the default `PathPrefixNavGrouper`. |
-| `setViewTitleGenerator(Function<MenuEntry, String>)` | `@Menu#title()` | Label for desktop `SideNavItem`s only — touch/rail labels always use `NavNode.title()`. |
+| Method                                                        | Default                | Description                                                                                                                                                                        |
+|---------------------------------------------------------------|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `addBrandContent(Component...)`                               | —                      | Logo/title: header (desktop) or drawer top (mobile). Pass individual components, not pre-wrapped.                                                                                  |
+| `setUserMenu(Component)`                                      | —                      | User widget: header trailing (desktop) or drawer bottom (mobile).                                                                                                                  |
+| `setNavPathMatcher(BiPredicate<String, String>)`              | `String::equals`       | Active-item path matching for touch/rail highlighting only — desktop `SideNav` highlights via Vaadin's own router matching.                                                        |
+| `setNavMatchNested(boolean)`                                  | `false`                | Whether desktop `SideNavItem`s use `setMatchNested`, so a parent stays highlighted while any child route is active.                                                                |
+| `setNavGrouper(NavGrouper)`                                   | `PathPrefixNavGrouper` | Full grouping strategy override. **Severs** the automatic wiring to `setViewNavGroupResolver`/`setViewIconGenerator` — configure a custom grouper directly before passing it here. |
+| `setNavNodeRenderer(ComponentRenderer<SideNavItem, NavNode>)` | built-in               | Custom desktop `SideNavItem` renderer.                                                                                                                                             |
+| `setViewNavGroupResolver(Function<MenuEntry, NavGroup>)`      | path-based (`null`)    | Explicit group assignment for a view; return `null` for path-based grouping. Only takes effect through the default `PathPrefixNavGrouper`.                                         |
+| `setViewIconGenerator(Function<MenuEntry, Supplier<Icon>>)`   | no icon                | Icon for each leaf nav item. Only takes effect through the default `PathPrefixNavGrouper`.                                                                                         |
+| `setViewTitleGenerator(Function<MenuEntry, String>)`          | `@Menu#title()`        | Label for desktop `SideNavItem`s only — touch/rail labels always use `NavNode.title()`.                                                                                            |
 
 `NavRenderer` setters (protected — call from the subclass constructor or later): each takes a
 `Supplier<NavRenderer>`, invoked at most once — the first time that scenario is actually needed,
 not eagerly. If the scenario is currently active, it's torn down and rebuilt immediately.
 
-| Method | Default | Description |
-|---|---|---|
-| `setDesktopNavRenderer(Supplier<NavRenderer>)` | `SideNavDrawerNavRenderer::new` | Renderer for the desktop scenario. |
-| `setTabletPortraitNavRenderer(Supplier<NavRenderer>)` | `SideRailNavRenderer::new` | Renderer for the portrait-tablet scenario. |
-| `setTabletLandscapeNavRenderer(Supplier<NavRenderer>)` | `SideNavDrawerNavRenderer::new` | Renderer for the landscape-tablet scenario — matches the desktop default, since both resolve to `NavType.SIDENAV`. |
-| `setTabletNavRenderer(Supplier<NavRenderer>)` | — | Convenience: sets both tablet orientations to one shared, memoized instance. Both orientations get that renderer's own chrome (its `navType()`), so e.g. supplying `SideRailNavRenderer` correctly gives rail chrome in both orientations. |
-| `setPhonePortraitNavRenderer(Supplier<NavRenderer>)` | `TouchBarNavRenderer::new` | Renderer for the portrait-phone scenario. |
-| `setPhoneLandscapeNavRenderer(Supplier<NavRenderer>)` | same instance as portrait-phone | Renderer for the landscape-phone scenario. |
-| `setPhoneNavRenderer(Supplier<NavRenderer>)` | — | Convenience: sets both phone orientations to one shared, memoized instance — the correct default relationship for phone, since both orientations already resolve to the same `NavType` and slot. |
+| Method                                                 | Default                          | Description                                                                                                                                                                                                                                |
+|--------------------------------------------------------|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `setDesktopNavRenderer(Supplier<NavRenderer>)`         | `SideNavDrawerNavRenderer::new`  | Renderer for the desktop scenario.                                                                                                                                                                                                         |
+| `setTabletPortraitNavRenderer(Supplier<NavRenderer>)`  | `SideRailNavRenderer::new`       | Renderer for the portrait-tablet scenario.                                                                                                                                                                                                 |
+| `setTabletLandscapeNavRenderer(Supplier<NavRenderer>)` | same instance as portrait-tablet | Renderer for the landscape-tablet scenario.                                                                                                                                                                                                |
+| `setTabletNavRenderer(Supplier<NavRenderer>)`          | —                                | Convenience: sets both tablet orientations to one shared, memoized instance. Both orientations get that renderer's own chrome (its `navType()`), so e.g. supplying `SideRailNavRenderer` correctly gives rail chrome in both orientations. |
+| `setPhonePortraitNavRenderer(Supplier<NavRenderer>)`   | `TouchBarNavRenderer::new`       | Renderer for the portrait-phone scenario.                                                                                                                                                                                                  |
+| `setPhoneLandscapeNavRenderer(Supplier<NavRenderer>)`  | same instance as portrait-phone  | Renderer for the landscape-phone scenario.                                                                                                                                                                                                 |
+| `setPhoneNavRenderer(Supplier<NavRenderer>)`           | —                                | Convenience: sets both phone orientations to one shared, memoized instance — the correct default relationship for phone, since both orientations already resolve to the same `NavType` and slot.                                           |
 
 Public fluent setters (each returns `this`):
 
-| Method | Default | Description |
-|---|---|---|
-| `setTabletMinShortSidePx(int px)` | `768` | Physical-screen-shorter-side threshold (CSS px) distinguishing `TABLET` from `PHONE` among touch devices. Re-evaluates device type and nav type immediately if already attached. Throws `IllegalArgumentException` if negative. |
-| `setAppTitle(String)` | — | Updates the title returned by `getAppTitle()`. |
+| Method                            | Default | Description                                                                                                                                                                                                                     |
+|-----------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `setTabletMinShortSidePx(int px)` | `768`   | Physical-screen-shorter-side threshold (CSS px) distinguishing `TABLET` from `PHONE` among touch devices. Re-evaluates device type and nav type immediately if already attached. Throws `IllegalArgumentException` if negative. |
+| `setAppTitle(String)`             | —       | Updates the title returned by `getAppTitle()`.                                                                                                                                                                                  |
 
 Lifecycle hooks and events:
 
-| Member | Description |
-|---|---|
-| `onNavTypeChanged(NavTypeChangedEvent event)` | Protected, no-op by default. Override to react to nav-type determination, including the first attachment. |
-| `addNavTypeChangedListener(ComponentEventListener<NavTypeChangedEvent>)` | Public, returns a `Registration`. For non-subclass consumers of the same event. |
-| `afterNavigation(AfterNavigationEvent event)` | Public, from `AfterNavigationObserver`. Rebuilds the adaptive view header from the current view's `HasViewHeaderTitle`/`HasViewHeaderComponent`, and re-invokes the active `NavRenderer`(s) so active-item highlighting and drill-down content stay current. |
+| Member                                                                   | Description                                                                                                                                                                                                                                                  |
+|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `onNavTypeChanged(NavTypeChangedEvent event)`                            | Protected, no-op by default. Override to react to nav-type determination, including the first attachment.                                                                                                                                                    |
+| `addNavTypeChangedListener(ComponentEventListener<NavTypeChangedEvent>)` | Public, returns a `Registration`. For non-subclass consumers of the same event.                                                                                                                                                                              |
+| `afterNavigation(AfterNavigationEvent event)`                            | Public, from `AfterNavigationObserver`. Rebuilds the adaptive view header from the current view's `HasViewHeaderTitle`/`HasViewHeaderComponent`, and re-invokes the active `NavRenderer`(s) so active-item highlighting and drill-down content stay current. |
 
 Accessors and escape hatch:
 
-| Member | Description |
-|---|---|
-| `getAppTitle()` | Protected. Returns the app title supplied by the subclass. |
-| `isMobile()` | Protected. `true` for touch/rail nav, `false` for desktop `SIDENAV` — and `false` before the first `onAttach()` completes (device detection isn't ready yet). Don't call from a subclass constructor. |
-| `addToNavbar(Component...)` | Public, overrides `AppLayout`. Appends directly to the top bar row; prefer the named adaptive methods above. |
+| Member                      | Description                                                                                                                                                                                           |
+|-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `getAppTitle()`             | Protected. Returns the app title supplied by the subclass.                                                                                                                                            |
+| `isMobile()`                | Protected. `true` for touch/rail nav, `false` for desktop `SIDENAV` — and `false` before the first `onAttach()` completes (device detection isn't ready yet). Don't call from a subclass constructor. |
+| `addToNavbar(Component...)` | Public, overrides `AppLayout`. Appends directly to the top bar row; prefer the named adaptive methods above.                                                                                          |
 
 #### `NavTypeChangedEvent`
 
 Fired whenever `AppNavLayout` determines and applies a `NavType`, including on first attachment.
 
-| Method | Description |
-|---|---|
-| `getNavType()` | The newly applied nav type. |
-| `getPreviousNavType()` | The previously active nav type, or `null` on first attachment. |
+| Method                   | Description                                                       |
+|--------------------------|-------------------------------------------------------------------|
+| `getNavType()`           | The newly applied nav type.                                       |
+| `getPreviousNavType()`   | The previously active nav type, or `null` on first attachment.    |
 | `isInitialApplication()` | `true` if this is the first nav type ever applied to this layout. |
 
 #### `NavRenderer`
@@ -248,130 +249,129 @@ whichever of `AppNavLayout`'s named locations (see `NavSlots`) is appropriate. D
 decoupled from nav organization: a renderer receives an already-configured `NavGrouper` and
 never influences or queries how the tree is grouped.
 
-| Method | Description |
-|---|---|
+| Method                             | Description                                                                                                                                                                                                                                                                                                                                                                                               |
+|------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `render(NavRenderContext context)` | Builds or updates this renderer's content for the current nav state. Called once when this scenario becomes active, again on every completed navigation, and again whenever nav configuration changes (grouper swap, path matcher change). Decides which slot(s) to populate and how — including any overflow/drill-down scaffolding it needs (a "More…" popover, a chevron, a swipeable container, etc). |
-| `navType()` | The chrome this renderer requires (`SIDENAV`, `RAIL`, or `TOUCH`) — determines which `NavStrategy` gets built for whichever scenario this renderer is configured for. Not a free choice: a renderer's `render()` already assumes one specific `NavSlots` accessor is live, and that slot is only live under the matching `NavType`'s strategy. |
+| `navType()`                        | The chrome this renderer requires (`SIDENAV`, `RAIL`, or `TOUCH`) — determines which `NavStrategy` gets built for whichever scenario this renderer is configured for. Not a free choice: a renderer's `render()` already assumes one specific `NavSlots` accessor is live, and that slot is only live under the matching `NavType`'s strategy.                                                            |
 
 #### `NavRenderContext`
 
 Passed to `NavRenderer.render(...)`.
 
-| Method | Description |
-|---|---|
-| `navGrouper()` | The current nav grouping strategy. |
+| Method          | Description                                                        |
+|-----------------|--------------------------------------------------------------------|
+| `navGrouper()`  | The current nav grouping strategy.                                 |
 | `currentPath()` | The path of the currently active navigation, leading `/` stripped. |
-| `slots()` | The full set of named locations available to render into. |
+| `slots()`       | The full set of named locations available to render into.          |
 
 #### `NavSlots`
 
 `AppNavLayout`'s whole shape, exposed identically to every renderer regardless of scenario — a
 renderer sees all four locations and decides for itself which are relevant to it.
 
-| Method | Description |
-|---|---|
-| `drawer()` | Desktop/landscape-tablet nav location, inside the drawer. |
-| `sideRail()` | Portrait-tablet nav location, the left-edge rail. |
-| `touchBar()` | Phone nav location, the bottom bar. |
+| Method        | Description                                                                                                                                                                          |
+|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `drawer()`    | Desktop nav location, inside the drawer.                                                                                                                                             |
+| `sideRail()`  | Tablet nav location (both orientations), the left-edge rail.                                                                                                                         |
+| `touchBar()`  | Phone nav location, the bottom bar.                                                                                                                                                  |
 | `headerNav()` | Shared drill-down location for nested routes, alongside `sideRail()`/`touchBar()`. Distinct from the per-view header slot (see [View header integration](#view-header-integration)). |
 
 #### `SideNavDrawerNavRenderer`
 
-Default `NavRenderer` for the desktop scenario (and, independently, the landscape-tablet
-scenario) — builds a full `SideNav` hierarchy into `NavSlots.drawer()`, honoring
-`setNavNodeRenderer`/`setNavMatchNested`. Public no-arg constructor.
+Default `NavRenderer` for the desktop scenario — builds a full `SideNav` hierarchy into
+`NavSlots.drawer()`, honoring `setNavNodeRenderer`/`setNavMatchNested`. Public no-arg constructor.
 
 #### `SideRailNavRenderer` / `TouchBarNavRenderer`
 
-Default `NavRenderer`s for the portrait-tablet and phone scenarios respectively: a primary icon
-bar (rail or bottom bar) with a "More" overflow `Popover` when more root sections exist than
-fit, plus a shared two-level drill-down bar in `NavSlots.headerNav()`. Both public, no-arg
-constructors, sharing their implementation internally.
+Default `NavRenderer`s for the tablet (both orientations) and phone scenarios respectively: a
+primary icon bar (rail or bottom bar) with a "More" overflow `Popover` when more root sections
+exist than fit, plus a shared two-level drill-down bar in `NavSlots.headerNav()`. Both public,
+no-arg constructors, sharing their implementation internally.
 
-| Method | Description |
-|---|---|
+| Method                                                                                                                      | Description                                                                                                                                                                                                                                                                                                                                                                       |
+|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `createOverflowComponent(List<MenuEntry> overflowEntries, Button overflowTrigger, Map<NavNode, Button> overflowButtonsOut)` | Protected. Default: a `Popover` listing the overflowing entries. Override in a subclass to replace the overflow presentation (e.g. an expand chevron or a swipeable strip) while keeping bar layout, active highlighting, and header-nav delegation unchanged. Populate `overflowButtonsOut` the same way if the "More" item should highlight while one of its entries is active. |
 
 #### `NavGrouper` (`@FunctionalInterface`)
 
-| Member | Description |
-|---|---|
+| Member                             | Description                                                                                                                                                                                                                                          |
+|------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `NavNode nodeFor(MenuEntry entry)` | Maps a route entry to its `NavNode` in the nav tree. **Must be idempotent** — called on both the initial build and every subsequent navigation, so implementations must not mutate state on first call. Call order across entries is not guaranteed. |
-| `default void reset()` | No-op by default. Clears cached state so the next `nodeFor` calls start fresh. |
+| `default void reset()`             | No-op by default. Clears cached state so the next `nodeFor` calls start fresh.                                                                                                                                                                       |
 
 #### `PathPrefixNavGrouper` (the default `NavGrouper`)
 
 Derives the nav hierarchy from `@Route` path segments.
 
-| Method | Description |
-|---|---|
-| `setNavGroupDefResolver(Function<MenuEntry, NavGroup>)` | Returns `this`. Maps an entry to explicit `NavGroup` metadata; return `null` to fall back to path-based grouping. |
-| `setViewIconGenerator(Function<MenuEntry, Supplier<Icon>>)` | Returns `this`. Icon generator for leaf nodes; default is no icon. |
-| `reset()` | Clears all cached group/leaf nodes. |
-| `nodeFor(MenuEntry)` | Path-based grouping: entries sharing a first path segment share a group, auto-labeled from that segment (`RouteNavUtils.routeSegmentLabel`) unless a `NavGroup` resolver assigns one explicitly. |
+| Method                                                      | Description                                                                                                                                                                                      |
+|-------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `setNavGroupDefResolver(Function<MenuEntry, NavGroup>)`     | Returns `this`. Maps an entry to explicit `NavGroup` metadata; return `null` to fall back to path-based grouping.                                                                                |
+| `setViewIconGenerator(Function<MenuEntry, Supplier<Icon>>)` | Returns `this`. Icon generator for leaf nodes; default is no icon.                                                                                                                               |
+| `reset()`                                                   | Clears all cached group/leaf nodes.                                                                                                                                                              |
+| `nodeFor(MenuEntry)`                                        | Path-based grouping: entries sharing a first path segment share a group, auto-labeled from that segment (`RouteNavUtils.routeSegmentLabel`) unless a `NavGroup` resolver assigns one explicitly. |
 
 #### `NavGroup`
 
 Implement to declare explicit group metadata (title/icon/parent), paired with `AppNavLayout.setViewNavGroupResolver`.
 
-| Method | Description |
-|---|---|
-| `title()` | Display title for this group node. |
-| `icon()` | Returns a `Supplier<Icon>` for the group icon, or `null` for none. Each invocation must produce a **new** `Icon` instance — a cached instance gets silently moved on rebuild. |
-| `parent()` | The parent group, or `null` for a root group. |
+| Method     | Description                                                                                                                                                                   |
+|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `title()`  | Display title for this group node.                                                                                                                                            |
+| `icon()`   | Returns a `Supplier<Icon>` for the group icon, or `null` for none. Each invocation must produce a **new** `Icon` instance — a cached instance gets silently moved on rebuild. |
+| `parent()` | The parent group, or `null` for a root group.                                                                                                                                 |
 
 #### `NavNode`
 
 Immutable nav-tree node — a group (no `menuEntry()`) or a leaf (`menuEntry()` present).
 
-| Method | Description |
-|---|---|
-| `static NavNode of(String title, Supplier<Icon> iconSupplier)` | Root group node. |
-| `static NavNode of(String title, Supplier<Icon> iconSupplier, NavNode parent)` | Group node nested under `parent`. |
-| `static NavNode of(MenuEntry entry)` | Root leaf node; icon from `@Menu(icon=...)`. |
-| `static NavNode of(MenuEntry entry, Supplier<Icon> iconOverride)` | Root leaf node; `iconOverride` wins over `@Menu(icon=...)` if non-null. |
-| `static NavNode of(MenuEntry entry, NavNode parent)` | Leaf node nested under `parent`; icon from `@Menu(icon=...)`. |
+| Method                                                                            | Description                                                                              |
+|-----------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| `static NavNode of(String title, Supplier<Icon> iconSupplier)`                    | Root group node.                                                                         |
+| `static NavNode of(String title, Supplier<Icon> iconSupplier, NavNode parent)`    | Group node nested under `parent`.                                                        |
+| `static NavNode of(MenuEntry entry)`                                              | Root leaf node; icon from `@Menu(icon=...)`.                                             |
+| `static NavNode of(MenuEntry entry, Supplier<Icon> iconOverride)`                 | Root leaf node; `iconOverride` wins over `@Menu(icon=...)` if non-null.                  |
+| `static NavNode of(MenuEntry entry, NavNode parent)`                              | Leaf node nested under `parent`; icon from `@Menu(icon=...)`.                            |
 | `static NavNode of(MenuEntry entry, Supplier<Icon> iconOverride, NavNode parent)` | Leaf node nested under `parent`; `iconOverride` wins over `@Menu(icon=...)` if non-null. |
-| `title()` | Display title for this node. |
-| `createIcon()` | Returns a fresh `Optional<Icon>` — a new instance on every call; never cache the result. |
-| `parent()` | `Optional<NavNode>` — empty for top-level nodes. |
-| `menuEntry()` | `Optional<MenuEntry>` — present for leaves, empty for groups. |
+| `title()`                                                                         | Display title for this node.                                                             |
+| `createIcon()`                                                                    | Returns a fresh `Optional<Icon>` — a new instance on every call; never cache the result. |
+| `parent()`                                                                        | `Optional<NavNode>` — empty for top-level nodes.                                         |
+| `menuEntry()`                                                                     | `Optional<MenuEntry>` — present for leaves, empty for groups.                            |
 
 #### `RouteNavUtils`
 
 Stateless static helpers.
 
-| Method | Description |
-|---|---|
-| `pathSegments(String routePath)` | Path segments as an immutable list; empty path (e.g. root `""`) returns `List.of()`, not a list containing one empty string. |
-| `normalizedPath(MenuEntry entry)` | `entry.path()` with any leading `/` stripped. |
-| `routeSegmentLabel(String segment)` | Capitalizes each hyphen-delimited word, e.g. `"audit-log"` → `"Audit Log"`. |
-| `leafTitle(MenuEntry entry)` | `@Menu` title, falling back to `normalizedPath(entry)` when absent. |
+| Method                              | Description                                                                                                                  |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `pathSegments(String routePath)`    | Path segments as an immutable list; empty path (e.g. root `""`) returns `List.of()`, not a list containing one empty string. |
+| `normalizedPath(MenuEntry entry)`   | `entry.path()` with any leading `/` stripped.                                                                                |
+| `routeSegmentLabel(String segment)` | Capitalizes each hyphen-delimited word, e.g. `"audit-log"` → `"Audit Log"`.                                                  |
+| `leafTitle(MenuEntry entry)`        | `@Menu` title, falling back to `normalizedPath(entry)` when absent.                                                          |
 
 #### `NavType`, `DeviceType`, `Orientation` (enums)
 
-| Type | Constants |
-|---|---|
-| `NavType` | `TOUCH` — touch bottom bar + secondary tabs. `RAIL` — permanent left-strip icon rail. `SIDENAV` — drawer-based `SideNav`. Declared by the active scenario's `NavRenderer.navType()`, not chosen independently. |
-| `DeviceType` | `PHONE`, `TABLET`, `DESKTOP` — detected from touch capability and screen size. Defaults to `DESKTOP` before the async client round-trip completes, and for any non-touch device. |
-| `Orientation` | `PORTRAIT`, `LANDSCAPE` — re-evaluated on window resize for touch devices. Defaults to `LANDSCAPE` before the client round-trip completes. |
+| Type          | Constants                                                                                                                                                                                                      |
+|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `NavType`     | `TOUCH` — touch bottom bar + secondary tabs. `RAIL` — permanent left-strip icon rail. `SIDENAV` — drawer-based `SideNav`. Declared by the active scenario's `NavRenderer.navType()`, not chosen independently. |
+| `DeviceType`  | `PHONE`, `TABLET`, `DESKTOP` — detected from touch capability and screen size. Defaults to `DESKTOP` before the async client round-trip completes, and for any non-touch device.                               |
+| `Orientation` | `PORTRAIT`, `LANDSCAPE` — re-evaluated on window resize for touch devices. Defaults to `LANDSCAPE` before the client round-trip completes.                                                                     |
 
 #### `HasViewHeaderTitle`
 
 Implement on a view to contribute an auto-generated icon+title component to the adaptive header (desktop only).
 
-| Method | Description |
-|---|---|
-| `default Component getViewHeaderSuffix()` | `null` by default. Trailing component after the title (e.g. a badge); return a new instance on every navigation. |
-| `default Icon getViewHeaderIcon()` | `null` by default. Must return a **new** `Icon` instance on every call — a cached one gets silently moved on each navigation. |
-| `default Component getViewHeaderTitle()` | Composes icon + `@PageTitle` + suffix into the header title component; called on every navigation. Override to replace it entirely; return `null` to suppress the slot. |
+| Method                                    | Description                                                                                                                                                             |
+|-------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `default Component getViewHeaderSuffix()` | `null` by default. Trailing component after the title (e.g. a badge); return a new instance on every navigation.                                                        |
+| `default Icon getViewHeaderIcon()`        | `null` by default. Must return a **new** `Icon` instance on every call — a cached one gets silently moved on each navigation.                                           |
+| `default Component getViewHeaderTitle()`  | Composes icon + `@PageTitle` + suffix into the header title component; called on every navigation. Override to replace it entirely; return `null` to suppress the slot. |
 
 #### `HasViewHeaderComponent`
 
 Implement on a view to contribute an action component to the adaptive header (both desktop and mobile).
 
-| Method | Description |
-|---|---|
+| Method                               | Description                                                                                                                                                 |
+|--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Component getViewHeaderComponent()` | Called on every navigation. Return `null` to suppress the slot; return the same instance if it's already attached elsewhere, otherwise a new one each call. |
 
 ## Development

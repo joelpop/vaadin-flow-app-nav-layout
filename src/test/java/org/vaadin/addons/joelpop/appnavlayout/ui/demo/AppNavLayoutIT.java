@@ -39,7 +39,8 @@ class AppNavLayoutIT {
     private static final int DESKTOP_HEIGHT = 800;
 
     // Tablet: short side >= 768px triggers DeviceType.TABLET.
-    // Default selector: portrait → RAIL, landscape → SIDENAV.
+    // Default selector: RAIL in both orientations (see SplitTabletNavLayout/"/split-tablet" for
+    // a demo layout that still gives the two orientations genuinely different chrome).
     private static final int TABLET_PORTRAIT_WIDTH   = 820;
     private static final int TABLET_PORTRAIT_HEIGHT  = 1180;
     private static final int TABLET_LANDSCAPE_WIDTH  = 1180;
@@ -322,15 +323,18 @@ class AppNavLayoutIT {
 
     @Test
     void drawerOverlaysContentAfterOrientationChange() {
+        // Both tablet orientations default to RAIL now, so this exercises SplitTabletNavLayout
+        // ("/split-tablet"), which still gives landscape genuinely different (SIDENAV) chrome —
+        // see its own doc comment.
         newTabletPortraitPage();
-        navigateTo("/");
+        navigateTo("/split-tablet");
 
         // Initial RAIL state: drawer must be in overlay mode (not push mode).
         assertTrue((boolean) page.evaluate("() => document.querySelector('vaadin-app-layout').overlay"),
                 "drawer should be in overlay mode at portrait tablet");
         pauseForHumanIfHeaded();
 
-        // Rotate to landscape — default selector switches to SIDENAV.
+        // Rotate to landscape — this layout's own selector switches to SIDENAV.
         page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
         page.waitForFunction(
             "() => !document.querySelector('vaadin-app-layout').hasAttribute('nav-rail')",
@@ -351,22 +355,22 @@ class AppNavLayoutIT {
 
     @Test
     void secondaryNavSurvivesTabletOrientationChange() {
+        // Both tablet orientations default to RAIL now, so an orientation change no longer tears
+        // down and rebuilds the NavStrategy at all — the secondary tab bar simply stays visible
+        // throughout, a stronger guarantee than the old default's "reappears after switching to
+        // SIDENAV and back". That teardown/rebuild scenario is still covered separately, for API
+        // consumers who explicitly configure a tablet-orientation split — see
+        // drawerOverlaysContentAfterOrientationChange above (SplitTabletNavLayout).
         newTabletPortraitPage();
         navigateTo("/catalog/products");
         assertThat(page.locator(".secondary-tab-bar vaadin-tabs")).isVisible();
         pauseForHumanIfHeaded();
 
-        // Rotate to landscape — default selector switches to SIDENAV
         page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
-        page.waitForFunction(
-            "() => !document.querySelector('vaadin-app-layout').hasAttribute('nav-rail')",
-            null,
-            new Page.WaitForFunctionOptions().setTimeout(3000));
+        assertTrue(hasNavRailAttr(), "nav-rail must remain set after rotating to landscape");
+        assertThat(page.locator(".secondary-tab-bar vaadin-tabs")).isVisible();
         pauseForHumanIfHeaded();
 
-        // Rotate back to portrait — RAIL rebuilds; secondary nav must reappear.
-        // isVisible() is a Playwright web-first assertion that polls until it matches (or times
-        // out), so no explicit wait is needed beforehand.
         page.setViewportSize(TABLET_PORTRAIT_WIDTH, TABLET_PORTRAIT_HEIGHT);
         assertThat(page.locator(".secondary-tab-bar vaadin-tabs")).isVisible();
         pauseForHumanIfHeaded();
@@ -401,7 +405,11 @@ class AppNavLayoutIT {
     }
 
     @Test
-    void sidenavModeActivatesOnTabletLandscape() {
+    void railModeActivatesOnTabletLandscape() {
+        // Cold-launching directly in landscape (not landscape-via-rotation-from-portrait)
+        // matters — see sharedRailRendererActivatesRailInBothTabletOrientations below for why
+        // that distinction once mattered for a real bug; this is the same check for the default
+        // (now shared) renderer instead of an explicitly-configured one.
         context.close();
         context = browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT)
@@ -409,17 +417,20 @@ class AppNavLayoutIT {
         page = context.newPage();
         navigateTo("/");
 
-        // SIDENAV mode: no rail, side nav visible.
-        assertFalse(hasNavRailAttr(), "nav-rail must be absent in SIDENAV mode");
-        assertThat(page.locator("vaadin-side-nav")).isVisible();
-        assertThat(page.locator(".touch-nav-item")).not().isVisible();
+        // RAIL mode: nav-rail attribute present, left rail visible.
+        assertTrue(hasNavRailAttr(), "nav-rail attribute must be set in RAIL mode");
+        assertThat(page.locator(".touch-nav-item").first()).isVisible();
+        assertThat(page.locator("vaadin-side-nav")).not().isVisible();
         pauseForHumanIfHeaded();
     }
 
     @Test
     void navRailAttributeAbsentAfterOrientationChangeToSidenav() {
+        // Both tablet orientations default to RAIL now, so this exercises SplitTabletNavLayout
+        // ("/split-tablet"), which still gives landscape genuinely different (SIDENAV) chrome —
+        // see its own doc comment.
         newTabletPortraitPage();
-        navigateTo("/");
+        navigateTo("/split-tablet");
         assertTrue(hasNavRailAttr(), "nav-rail must be set in portrait (RAIL)");
 
         page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
@@ -979,8 +990,12 @@ class AppNavLayoutIT {
         // on removal — so AppLayout's own overlay mode, forced true for rail, never got
         // re-evaluated after leaving rail (portrait→landscape), leaving the drawer stuck in
         // overlay mode at zero width.
+        //
+        // Both tablet orientations default to RAIL now, so this exercises SplitTabletNavLayout
+        // ("/split-tablet"), which still gives landscape genuinely different (SIDENAV) chrome —
+        // see its own doc comment.
         newTabletPortraitPage();
-        navigateTo("/");
+        navigateTo("/split-tablet");
         assertTrue(hasNavRailAttr(), "nav-rail must be set in portrait (RAIL)");
 
         page.setViewportSize(TABLET_LANDSCAPE_WIDTH, TABLET_LANDSCAPE_HEIGHT);
