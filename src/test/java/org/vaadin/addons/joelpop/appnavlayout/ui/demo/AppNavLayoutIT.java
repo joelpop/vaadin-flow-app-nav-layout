@@ -1078,4 +1078,80 @@ class AppNavLayoutIT {
             "--vaadin-app-layout-navbar-offset-bottom must be zeroed in rail mode, not left holding "
                 + "navbar-bottom's stretched-to-viewport rendered height for some later cascade tie to leak");
     }
+
+    @Test
+    void overflowPopoverItemsAreStyledUnderBaseTheme() {
+        // Regression test for a real bug found while polishing the overflow popover's visual
+        // design (a "could use some love" request, not a functional bug report): every rule in
+        // app-nav-layout.ts styling .overflow-nav-item via a bare var(--lumo-*) reference (no
+        // fallback) was silently non-functional. Root cause, confirmed: this demo module itself
+        // runs Vaadin 25's true default — "base" (neither Lumo nor Aura; no theme attribute is
+        // set anywhere, and disabling the only aura.css <link> present changes nothing about
+        // this app's own components) — and "base" defines none of the --lumo-* custom
+        // properties at all. Since "base" is the only theme guarantee for any Vaadin add-on, a
+        // var(--lumo-*) reference with no fallback silently invalidates the *whole* declaration
+        // it's in (not just that one property) for any consumer not explicitly using Lumo — so
+        // the active/inactive text coloring silently fell through to whatever color was already
+        // inherited (coincidentally dark, so this had gone unnoticed), and the pre-existing
+        // :hover rule never did anything at all. Fixed by giving every --lumo-* reference in
+        // this file an explicit var() fallback, and by replacing LumoUtility Java class usage
+        // (which has no defining CSS at all under "base") with this add-on's own CSS classes.
+        newPhonePage();
+        navigateTo("/");
+        page.setViewportSize(NARROW_WIDTH, PHONE_HEIGHT);
+        assertThat(page.locator(".touch-nav-item")).hasCount(2);
+
+        page.evaluate("() => document.querySelector('vaadin-popover').opened = true");
+        var items = page.locator(".overflow-nav-item");
+        assertThat(items.first()).isVisible();
+
+        String inactiveColor = (String) items.first().evaluate("el => getComputedStyle(el).color");
+        assertTrue(!inactiveColor.isBlank() && !inactiveColor.equals("rgba(0, 0, 0, 0)"),
+            "inactive overflow item color must resolve via its fallback, not silently fail: " + inactiveColor);
+
+        String beforeHover = (String) items.first().evaluate("el => getComputedStyle(el).backgroundColor");
+        items.first().hover();
+        String onHover = (String) items.first().evaluate("el => getComputedStyle(el).backgroundColor");
+        assertTrue(!beforeHover.equals(onHover),
+            "hover background must actually change (was previously a silent no-op): "
+                + beforeHover + " -> " + onHover);
+    }
+
+    @Test
+    void touchNavItemsFlexUnderBaseTheme() {
+        // Regression test for the structural half of the same "base theme" bug covered by
+        // overflowPopoverItemsAreStyledUnderBaseTheme above — this one matters more, since a
+        // LumoUtility class with no defining CSS under "base" doesn't just mis-color an element,
+        // it leaves display/flex-direction/align-items/gap/padding unset entirely: icons and
+        // labels stack in whatever the browser's default block layout happens to do, not
+        // centered or spaced at all. Asserts the structural properties directly rather than
+        // relying on visibility/count checks, which this demo module's own existing tests
+        // already did without ever catching this (a plain, unstyled block-layout button is
+        // still "visible" and still countable).
+        newPhonePage();
+        navigateTo("/");
+
+        // The icon+label flex layout lives on the inner ".touch-nav-content" wrapper, not the
+        // ".touch-nav-item" vaadin-button host itself — Button lacks HasComponents and
+        // setText(String) only appends a raw text node, so icon+label are composed in a plain
+        // Div passed as the button's "icon" content instead (see AbstractTouchNavRenderer).
+        var content = page.locator(".touch-nav-content").first();
+        assertEquals("flex", content.evaluate("el => getComputedStyle(el).display"));
+        assertEquals("column", content.evaluate("el => getComputedStyle(el).flexDirection"));
+        assertEquals("center", content.evaluate("el => getComputedStyle(el).alignItems"));
+
+        // Narrow to overflow territory: hasCount() is a web-first assertion that polls until it
+        // matches, so no explicit wait is needed for the resize-driven Signal.effect to settle.
+        page.setViewportSize(NARROW_WIDTH, PHONE_HEIGHT);
+        assertThat(page.locator(".touch-nav-item")).hasCount(2);
+        page.evaluate("() => document.querySelector('vaadin-popover').opened = true");
+        var overflowContent = page.locator(".overflow-nav-content").first();
+        assertEquals("flex", overflowContent.evaluate("el => getComputedStyle(el).display"));
+        assertEquals("center", overflowContent.evaluate("el => getComputedStyle(el).alignItems"));
+        var overflowItem = page.locator(".overflow-nav-item").first();
+        assertTrue(((String) overflowItem.evaluate("el => getComputedStyle(el).paddingLeft")).matches("[1-9].*"),
+            "overflow item must have real padding for a comfortable tap target, not the "
+                + "vaadin-button's own tighter default (a plain class selector previously lost "
+                + "this cascade fight before it was worth double-checking)");
+    }
 }

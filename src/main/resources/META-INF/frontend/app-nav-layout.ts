@@ -15,6 +15,21 @@
  * The CSS must live here (not in a Java @StyleSheet) because some rules target
  * vaadin-app-layout's internal shadow DOM via ::part() — a CSS selector that
  * can cross shadow-DOM boundaries from outside the component.
+ *
+ * "base" (no Lumo, no Aura, no theme attribute at all) is the only theme any Vaadin
+ * add-on can rely on — a consuming app may use Lumo, Aura, a fully custom theme, or
+ * nothing. So this file references only the generic, theme-agnostic --vaadin-*
+ * design tokens (text/background/border colors, padding/gap scale — all defined
+ * unconditionally by @vaadin/component-base's style-props, confirmed present even
+ * with no theme selected at all), never a --lumo-* or --aura-* token directly. Both
+ * Lumo and Aura redefine these exact same --vaadin-* names to their own theme's
+ * values (e.g. Lumo's color.css sets --vaadin-text-color-secondary: var(--lumo-
+ * secondary-text-color)), so referencing the generic name still adapts correctly
+ * under either theme — there's nothing to gain from naming the theme-specific
+ * token directly, and doing so would only work under that one theme. Where no
+ * generic token exists at all (font-size, icon-size — typographic scale isn't part
+ * of the base design-token set), a plain literal value is used instead of guessing
+ * at a theme-specific one.
  */
 
 const GLOBAL_STYLES = new CSSStyleSheet();
@@ -100,7 +115,7 @@ GLOBAL_STYLES.replaceSync(`
         inset-inline-start: 0;
         z-index: 200;
         will-change: auto;
-        padding-block-start: var(--lumo-space-s);
+        padding-block-start: var(--vaadin-padding-s);
         padding-block-end: 0;
         /* --nav-rail-width is also what padding-inline-start on the host (below) uses to push
            routed content clear of the rail — that only lands correctly if this part's true
@@ -118,8 +133,8 @@ GLOBAL_STYLES.replaceSync(`
         box-sizing: border-box !important;
         width: var(--nav-rail-width, 5rem);
         padding-inline: 0 !important;
-        background: var(--lumo-contrast-5pct);
-        border-inline-end: 1px solid var(--lumo-contrast-10pct);
+        background: var(--vaadin-background-container);
+        border-inline-end: 1px solid var(--vaadin-border-color-secondary);
     }
 
     /* Drawer slides over the rail when opened. */
@@ -147,35 +162,130 @@ GLOBAL_STYLES.replaceSync(`
         padding-inline: 0 !important;
     }
 
-    /* Reset native <button> defaults so touch-nav-item / overflow-nav-item look like the design. */
-    button.touch-nav-item,
-    button.overflow-nav-item {
-        background: none;
-        border: none;
+    /* Primary nav bar: display/flex-direction/justify-content/align-items are set inline from
+       Java (AbstractTouchNavRenderer.ensureBuilt), since they depend on which of the two touch
+       renderers (rail vs. bottom bar) is active — only the theme-flavored bit (gap) lives here,
+       rail-scoped to match Java's own COLUMN-direction-only gap application. */
+    vaadin-app-layout[nav-rail] .nav-bar {
+        gap: var(--vaadin-gap-m);
+    }
+
+    /* This is a real vaadin-button (theme="tertiary" — see AbstractTouchNavRenderer.navItem's own
+       comment for why), not a bare reset element, so only sizing is overridden here; the button's
+       own tertiary-variant CSS already supplies a transparent background and borderless look. */
+    .touch-nav-item {
+        /* Overrides the flex-item default (min-width:auto, which pins the shrink floor to the
+           label's un-wrapped width) so an item can shrink below its own natural content width
+           and .touch-nav-label's ellipsis can engage instead of forcing the bar/rail wider than
+           intended — see AbstractTouchNavRenderer.navItem's own comment for the full story. */
+        min-width: 0;
         padding: 0;
-        cursor: pointer;
-        font: inherit;
-        text-align: start;
     }
 
-    /* Rail items: centered, with vertical padding for comfortable tap targets. */
+    /* Row-direction (bottom bar) items share the bar's width equally; column-direction (rail)
+       items are stretched to the rail's own width by the rail's own align-items:stretch instead. */
+    vaadin-app-layout:not([nav-rail]) .touch-nav-item {
+        flex: 1 1 0;
+    }
+
+    /* Rail items: vertical padding for comfortable tap targets. */
     vaadin-app-layout[nav-rail] .touch-nav-item {
-        padding-block: var(--lumo-space-s);
+        padding-block: var(--vaadin-padding-s);
     }
 
-    /* Active state for touch/rail/overflow nav items. */
-    .touch-nav-item.active,
-    .overflow-nav-item.active {
-        color: var(--lumo-primary-color);
+    /* Icon+label layout for both touch/rail items and overflow-popover items lives on this inner
+       wrapper, not the vaadin-button host itself — Button lacks HasComponents and setText(String)
+       only appends a raw text node (no element to attach .touch-nav-label's styling to), so the
+       icon and label are composed in a plain Div passed as the button's "icon" content instead;
+       see AbstractTouchNavRenderer.navItem's own comment. */
+    .touch-nav-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--vaadin-gap-xs);
+        min-width: 0;
     }
 
-    /* Overflow popover buttons: secondary by default, primary when active. */
+    .touch-nav-label {
+        /* No generic --vaadin-font-size-* scale exists (typography isn't part of the base
+           design-token set — see file header), so a plain literal value is used here. */
+        font-size: 0.75rem;
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        /* align-items:center above (needed to center the icon) doesn't stretch this label to
+           the item's own width, so without this the ellipsis/overflow above never has anything
+           to actually shrink against — it would just overflow instead of truncating. */
+        max-width: 100%;
+    }
+
+    /* Active vs. inactive state for touch/rail/overflow nav items. Both are real vaadin-buttons
+       with theme="tertiary" (see AbstractTouchNavRenderer.navItem's own comment), whose own CSS
+       already colors the button's text in the active theme's own accent (Lumo blue, Aura's
+       accent, or a neutral default under base) — exactly the behavior the user expects to match
+       vaadin-side-nav-item's own selected-item color. Inactive items override that back down to
+       the muted secondary color; !important is needed to win over the button's own tertiary-
+       variant color rule, which the theme's own stylesheet sets at equal selector specificity. */
+    .touch-nav-item:not(.active),
     .overflow-nav-item:not(.active) {
-        color: var(--lumo-secondary-text-color);
+        color: var(--vaadin-text-color-secondary) !important;
     }
 
+    /* Overflow popover buttons: full-width, left-aligned (Button's own default centers content). */
+    .overflow-nav-item {
+        justify-content: flex-start;
+        padding-inline: var(--vaadin-padding-m);
+        padding-block: var(--vaadin-padding-m);
+    }
+
+    /* Icon+label row layout — see .touch-nav-content above for why this lives on an inner
+       wrapper rather than the button host itself. */
+    .overflow-nav-content {
+        display: flex;
+        align-items: center;
+        gap: var(--vaadin-gap-m);
+    }
+
+    /* !important needed to win over the button's own tertiary-variant background rule (transparent),
+       set by the theme's own stylesheet at equal selector specificity — same fight as the active/
+       inactive color rule above. */
     .overflow-nav-item:hover {
-        background: var(--lumo-contrast-5pct);
+        background: var(--vaadin-background-container) !important;
+    }
+
+    /* :active (not just :hover) gives touch input real tap feedback — on a touchscreen,
+       :hover can stick after a tap instead of clearing, or never engage at all, since these
+       items exist specifically for touch/rail nav. "Strong" variant so it's visibly a step up
+       from the :hover background above, not just a repeat of it. */
+    .overflow-nav-item:active {
+        background: var(--vaadin-background-container-strong) !important;
+    }
+
+    /* Desktop-only view header bottom border — toggled on/off by DesktopNavStrategy's own
+       build()/tearDown(), since only that NavType's chrome ever wants it. */
+    .view-header-slot-bordered {
+        border-bottom: 1px solid var(--vaadin-border-color-secondary);
+    }
+
+    /* Default HasViewHeaderTitle.getViewHeaderTitle() layout: icon + heading + optional suffix. */
+    .view-header-title {
+        gap: var(--vaadin-gap-s);
+    }
+
+    /* No generic --vaadin-icon-size-* scale exists — see file header — so a plain literal
+       value is used here. */
+    .view-header-icon {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .view-header-title-text {
+        /* No generic --vaadin-font-size-* scale exists — see file header. */
+        font-size: 1.375rem;
+        font-weight: 600;
+        color: var(--vaadin-text-color);
+        margin: 0;
     }
 `);
 document.adoptedStyleSheets = [...document.adoptedStyleSheets, GLOBAL_STYLES];

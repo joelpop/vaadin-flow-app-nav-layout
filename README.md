@@ -140,7 +140,7 @@ phone touch bar's overflow presentation:
 setPhoneNavRenderer(() -> new TouchBarNavRenderer() {
     @Override
     protected Component createOverflowComponent(List<MenuEntry> overflowEntries,
-            NativeButton overflowTrigger, Map<NavNode, NativeButton> overflowButtonsOut) {
+            Button overflowTrigger, Map<NavNode, Button> overflowButtonsOut) {
         return myChevronExpandComponent(overflowEntries, overflowTrigger, overflowButtonsOut);
     }
 });
@@ -290,7 +290,7 @@ constructors, sharing their implementation internally.
 
 | Method | Description |
 |---|---|
-| `createOverflowComponent(List<MenuEntry> overflowEntries, NativeButton overflowTrigger, Map<NavNode, NativeButton> overflowButtonsOut)` | Protected. Default: a `Popover` listing the overflowing entries. Override in a subclass to replace the overflow presentation (e.g. an expand chevron or a swipeable strip) while keeping bar layout, active highlighting, and header-nav delegation unchanged. Populate `overflowButtonsOut` the same way if the "More" item should highlight while one of its entries is active. |
+| `createOverflowComponent(List<MenuEntry> overflowEntries, Button overflowTrigger, Map<NavNode, Button> overflowButtonsOut)` | Protected. Default: a `Popover` listing the overflowing entries. Override in a subclass to replace the overflow presentation (e.g. an expand chevron or a swipeable strip) while keeping bar layout, active highlighting, and header-nav delegation unchanged. Populate `overflowButtonsOut` the same way if the "More" item should highlight while one of its entries is active. |
 
 #### `NavGrouper` (`@FunctionalInterface`)
 

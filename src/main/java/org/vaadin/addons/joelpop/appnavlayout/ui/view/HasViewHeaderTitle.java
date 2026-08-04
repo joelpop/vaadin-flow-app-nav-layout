@@ -6,7 +6,6 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.router.PageTitle;
-import com.vaadin.flow.theme.lumo.LumoUtility;
 
 /**
  * Implemented by views that want an auto-generated icon+title component in the
@@ -62,18 +61,20 @@ public interface HasViewHeaderTitle {
             return null;
         }
 
+        // Structural/theme styling (gap, icon size, heading font/color/margin) lives in this
+        // add-on's own CSS (app-nav-layout.ts), not as Java-side theme utility classes — see
+        // that file's header comment for why.
         var layout = new HorizontalLayout();
         layout.setAlignItems(FlexComponent.Alignment.CENTER);
-        layout.addClassNames(LumoUtility.Gap.SMALL);
+        layout.addClassName("view-header-title");
 
         if (icon != null) {
-            icon.addClassName(LumoUtility.IconSize.MEDIUM);
+            icon.addClassName("view-header-icon");
             layout.add(icon);
         }
         if (titleAnno != null) {
             var h2 = new H2(titleAnno.value());
-            h2.addClassNames(LumoUtility.FontSize.XLARGE, LumoUtility.FontWeight.SEMIBOLD,
-                    LumoUtility.TextColor.HEADER, LumoUtility.Margin.NONE);
+            h2.addClassName("view-header-title-text");
             layout.add(h2);
         }
         if (suffix != null) {

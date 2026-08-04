@@ -8,7 +8,6 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.sidenav.SideNav;
-import com.vaadin.flow.theme.lumo.LumoUtility;
 
 /** {@link NavStrategy} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#SIDENAV}:
  *  header brand/user content, plus a drawer nav slot rendered by whichever {@link NavRenderer}
@@ -42,7 +41,7 @@ final class DesktopNavStrategy implements NavStrategy {
         owner.topBar.add(brandContainer, userContainer);
         owner.topBar.expand(brandContainer);
 
-        owner.viewHeaderSlot.addClassNames(LumoUtility.Border.BOTTOM, LumoUtility.BorderColor.CONTRAST_10);
+        owner.viewHeaderSlot.addClassName("view-header-slot-bordered");
 
         drawerNavSlot = new VerticalLayout();
         drawerNavSlot.setPadding(false);
@@ -55,7 +54,7 @@ final class DesktopNavStrategy implements NavStrategy {
     public void tearDown() {
         owner.topBar.remove(brandContainer, userContainer);
         drawerNavSlot.getElement().removeFromParent();
-        owner.viewHeaderSlot.removeClassNames(LumoUtility.Border.BOTTOM, LumoUtility.BorderColor.CONTRAST_10);
+        owner.viewHeaderSlot.removeClassName("view-header-slot-bordered");
         brandContainer = null;
         userContainer = null;
         drawerNavSlot = null;

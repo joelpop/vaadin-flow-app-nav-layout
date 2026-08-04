@@ -9,7 +9,7 @@ import com.vaadin.flow.component.HasComponents;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.html.NativeButton;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -24,7 +24,6 @@ import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.signals.Signal;
-import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -63,8 +62,8 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     private FlexLayout bar;
     private int maxIcons = 5;
     private NavNode overflowNode;
-    private final Map<NavNode, NativeButton> navItems = new LinkedHashMap<>();
-    private final Map<NavNode, NativeButton> overflowButtons = new LinkedHashMap<>();
+    private final Map<NavNode, Button> navItems = new LinkedHashMap<>();
+    private final Map<NavNode, Button> overflowButtons = new LinkedHashMap<>();
 
     // Slot components this renderer last attached its bar/headerNavBar into — used to detect a
     // NavStrategy tear-down/rebuild (fresh slot instances), since this renderer itself outlives
@@ -124,6 +123,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         var primary = primarySlot(slots);
         if (bar == null || attachedPrimarySlot != primary) {
             bar = new FlexLayout();
+            bar.addClassName("nav-bar");
             bar.setFlexDirection(direction);
             if (direction == FlexLayout.FlexDirection.COLUMN) {
                 bar.setSizeFull();
@@ -135,7 +135,6 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
                 // min-width:0 on each item below (needed because STRETCH still respects
                 // min-width:auto's default shrink floor, same as flex-grow does for the row bar).
                 bar.setAlignItems(FlexComponent.Alignment.STRETCH);
-                bar.addClassName(LumoUtility.Gap.MEDIUM);
             }
             else {
                 bar.setWidthFull();
@@ -270,41 +269,59 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         return node;
     }
 
-    private NativeButton navItem(String title, Icon icon, Class<? extends Component> viewClass) {
+    private Button navItem(String title, Icon icon, Class<? extends Component> viewClass) {
         icon.setSize("20px");
 
         var titleSpan = new Span(title);
-        titleSpan.addClassNames(LumoUtility.FontSize.XXSMALL, LumoUtility.FontWeight.BOLD,
-                LumoUtility.TextOverflow.ELLIPSIS);
-        // align-items:center below (needed to center the icon) doesn't stretch this span to the
-        // item's width, so without this the ellipsis class above never has anything to actually
-        // shrink against — it would just overflow instead of truncating.
-        titleSpan.getStyle().set("max-width", "100%");
+        titleSpan.addClassName("touch-nav-label");
 
-        var item = new NativeButton();
-        item.add(icon, titleSpan);
-        item.addClassNames("touch-nav-item",
-                LumoUtility.Display.FLEX,
-                LumoUtility.FlexDirection.COLUMN,
-                LumoUtility.AlignItems.CENTER,
-                LumoUtility.TextColor.SECONDARY);
+        // Button lacks HasComponents and setText(String) only appends a raw text node (no
+        // element to attach the label's own styling to), so icon+label are composed in a plain
+        // Div passed as the button's "icon" content instead — see app-nav-layout.ts's
+        // "touch-nav-content" rule for the resulting layout.
+        var content = new Div(icon, titleSpan);
+        content.addClassName("touch-nav-content");
 
-        // min-width:0 overrides the flex-item default (min-width:auto, which pins the shrink
-        // floor to the label's un-wrapped width) so an item can actually shrink below its own
-        // natural content width and the ellipsis above can engage instead of forcing the bar (row)
-        // or the rail (column, via its own cross-axis stretch) wider than intended. Needed in both
+        var item = createNavButton(content, viewClass);
+        // Structural layout (sizing/padding) and the row-direction flex:1 1 0 live in this
+        // add-on's own CSS (app-nav-layout.ts, keyed off "touch-nav-item"), not as Java-side
+        // theme utility classes — see that file's header comment for why. min-width:0 there
+        // overrides the flex-item default (min-width:auto, which pins the shrink floor to the
+        // label's un-wrapped width) so an item can actually shrink below its own natural content
+        // width and .touch-nav-label's ellipsis can engage instead of forcing the bar (row) or
+        // the rail (column, via its own cross-axis stretch) wider than intended. Needed in both
         // directions: MIN_SLOT_PX only ever decided *whether* to show "More"/how many rail icons
         // fit, never enforced a real per-item width ceiling on rendering — a long label (e.g.
         // "Analytics") could otherwise push a row past its right edge, or push the rail wider
         // than its own explicit CSS width (which then throws off vaadin-app-layout's own
         // measurement-based sizing of the header, since it accounts for the rail's *rendered*,
         // not intended, width).
-        item.getStyle().set("min-width", "0");
-        if (direction == FlexLayout.FlexDirection.ROW) {
-            // Equal-width, shrinkable items instead of each item's own natural width — see above.
-            item.getStyle().set("flex", "1 1 0");
-        }
+        item.addClassName("touch-nav-item");
+        return item;
+    }
 
+    /**
+     * Builds a nav-bar item {@link Button} wrapping {@code content}, themed so an {@code .active}
+     * item (this add-on's own CSS, keyed off that class) picks up whichever theme is actually
+     * loaded's own accent color, and navigating to {@code viewClass} on click (or doing nothing
+     * on click if {@code null} — the "More" overflow trigger has no route of its own).
+     *
+     * <p>theme="tertiary" is a cross-theme-consistent variant name, not a Lumo-only mechanism
+     * despite {@link ButtonVariant#LUMO_TERTIARY}'s legacy "LUMO_" naming — Aura's own button.css
+     * keys off the identical theme="tertiary" attribute, and the un-themed base package supplies
+     * its own sensible default too. This is what lets an {@code .active} item pick up the active
+     * theme's own accent color (Lumo blue, Aura's accent, neutral under base) automatically,
+     * matching {@code vaadin-side-nav-item}'s own selected-item color — the inactive state is
+     * forced back to the neutral secondary color in CSS (app-nav-layout.ts).
+     *
+     * <p>Exposed (not just used internally by {@link #navItem}) so a {@link #createOverflowComponent}
+     * override that still wants per-entry buttons doesn't have to reimplement this theming/wiring
+     * by hand — reuse this rather than constructing a {@code Button} directly, or the item risks
+     * silently losing the theme-adaptive color this method exists to guarantee.
+     */
+    protected Button createNavButton(Component content, Class<? extends Component> viewClass) {
+        var item = new Button(content);
+        item.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         if (viewClass != null) {
             item.addClickListener(unused -> UI.getCurrent().navigate(viewClass));
         }
@@ -317,10 +334,12 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
      * overflow presentation (e.g. an expand chevron or a swipeable strip) while keeping bar
      * layout, active highlighting, and header-nav delegation unchanged. Implementations that
      * want the "More" item to highlight while one of their entries is active should populate
-     * {@code overflowButtonsOut} the same way this default does.
+     * {@code overflowButtonsOut} the same way this default does. If the replacement presentation
+     * still uses one button per entry, build them via {@link #createNavButton} rather than a
+     * plain {@code new Button(...)} to keep the same theme-adaptive active-color behavior.
      */
-    protected Component createOverflowComponent(List<MenuEntry> overflowEntries, NativeButton overflowTrigger,
-                                                 Map<NavNode, NativeButton> overflowButtonsOut) {
+    protected Component createOverflowComponent(List<MenuEntry> overflowEntries, Button overflowTrigger,
+                                                 Map<NavNode, Button> overflowButtonsOut) {
         var layout = new VerticalLayout();
         layout.setPadding(false);
         layout.setSpacing(false);
@@ -333,19 +352,19 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
             var icon = rootNode.createIcon().orElse(VaadinIcon.CIRCLE.create());
             icon.setSize("20px");
 
-            var btn = new NativeButton();
-            btn.add(icon, new Span(rootNode.title()));
-            btn.addClassNames("overflow-nav-item",
-                    LumoUtility.Display.FLEX,
-                    LumoUtility.AlignItems.CENTER,
-                    LumoUtility.Gap.SMALL,
-                    LumoUtility.Padding.Horizontal.MEDIUM,
-                    LumoUtility.Padding.Vertical.SMALL);
+            // See navItem()'s own comment: Button lacks HasComponents and setText(String) only
+            // appends a raw text node, so icon+label are composed in a plain Div passed as the
+            // button's "icon" content instead.
+            var content = new Div(icon, new Span(rootNode.title()));
+            content.addClassName("overflow-nav-content");
+
+            var btn = createNavButton(content, entry.menuClass());
+            // Structural layout (padding/alignment/color) lives in this add-on's own CSS
+            // (app-nav-layout.ts, keyed off "overflow-nav-item"), not as Java-side theme
+            // utility classes — see that file's header comment for why.
+            btn.addClassName("overflow-nav-item");
             btn.setWidthFull();
-            btn.addClickListener(unused -> {
-                UI.getCurrent().navigate(entry.menuClass());
-                popover.close();
-            });
+            btn.addClickListener(unused -> popover.close());
             overflowButtonsOut.put(rootNode, btn);
             layout.add(btn);
         }
