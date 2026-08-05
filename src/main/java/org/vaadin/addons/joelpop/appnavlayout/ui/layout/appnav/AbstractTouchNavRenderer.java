@@ -223,9 +223,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         for (var e : all.subList(0, Math.min(primaryCount, all.size()))) {
             var rootNode = e.getKey();
             var rep = e.getValue();
-            var item = navItem(rootNode.title(),
-                               rootNode.createIcon().orElse(VaadinIcon.CIRCLE.create()),
-                               rep.menuClass());
+            var item = navItem(rootNode.title(), rootNode.createIcon().orElse(null), rep.menuClass());
             navItems.put(rootNode, item);
             bar.add(item);
         }
@@ -270,17 +268,21 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     }
 
     private Button navItem(String title, Icon icon, Class<? extends Component> viewClass) {
-        icon.setSize("20px");
-
         var titleSpan = new Span(title);
         titleSpan.addClassName("touch-nav-label");
 
         // Button lacks HasComponents and setText(String) only appends a raw text node (no
         // element to attach the label's own styling to), so icon+label are composed in a plain
         // Div passed as the button's "icon" content instead — see app-nav-layout.ts's
-        // "touch-nav-content" rule for the resulting layout.
-        var content = new Div(icon, titleSpan);
+        // "touch-nav-content" rule for the resulting layout. icon is left out entirely (rather
+        // than falling back to a placeholder glyph) when a section has none, matching
+        // SideNavItem's own icon.ifPresent(...) behavior in AppNavLayout.defaultNavNodeRenderer.
+        var content = new Div(titleSpan);
         content.addClassName("touch-nav-content");
+        if (icon != null) {
+            icon.setSize("20px");
+            content.addComponentAsFirst(icon);
+        }
 
         var item = createNavButton(content, viewClass);
         // Structural layout (sizing/padding) and the row-direction flex:1 1 0 live in this
@@ -349,14 +351,17 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         popover.setTarget(overflowTrigger);
         for (var entry : overflowEntries) {
             var rootNode = rootNodeFor(entry);
-            var icon = rootNode.createIcon().orElse(VaadinIcon.CIRCLE.create());
-            icon.setSize("20px");
 
             // See navItem()'s own comment: Button lacks HasComponents and setText(String) only
             // appends a raw text node, so icon+label are composed in a plain Div passed as the
-            // button's "icon" content instead.
-            var content = new Div(icon, new Span(rootNode.title()));
+            // button's "icon" content instead. icon is left out entirely when a section has none
+            // (same rationale as navItem()) rather than falling back to a placeholder glyph.
+            var content = new Div(new Span(rootNode.title()));
             content.addClassName("overflow-nav-content");
+            rootNode.createIcon().ifPresent(icon -> {
+                icon.setSize("20px");
+                content.addComponentAsFirst(icon);
+            });
 
             var btn = createNavButton(content, entry.menuClass());
             // Structural layout (padding/alignment/color) lives in this add-on's own CSS
