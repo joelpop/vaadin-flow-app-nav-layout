@@ -7,8 +7,7 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav.AppNavLayout;
 @Layout
 public class DemoNavLayout extends AppNavLayout {
     public DemoNavLayout() {
-        super("Demo App");
-        addBrandContent(new Span("Demo App"));
+        addBranding(new Span("Demo App"));
         setUserMenu(new Span("User"));
     }
 }

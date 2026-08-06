@@ -12,8 +12,7 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav.SideNavDrawerNavR
 public class AlwaysSidenavLayout extends AppNavLayout {
 
     public AlwaysSidenavLayout() {
-        super("Always Sidenav");
-        addBrandContent(new Span("Always Sidenav"));
+        addBranding(new Span("Always Sidenav"));
         setDesktopNavRenderer(SideNavDrawerNavRenderer::new);
         setTabletNavRenderer(SideNavDrawerNavRenderer::new);
         setPhoneNavRenderer(SideNavDrawerNavRenderer::new);

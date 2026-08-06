@@ -17,8 +17,7 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav.SideNavDrawerNavR
 public class SplitTabletNavLayout extends AppNavLayout {
 
     public SplitTabletNavLayout() {
-        super("Split Tablet");
-        addBrandContent(new Span("Split Tablet"));
+        addBranding(new Span("Split Tablet"));
         setTabletLandscapeNavRenderer(SideNavDrawerNavRenderer::new);
     }
 }

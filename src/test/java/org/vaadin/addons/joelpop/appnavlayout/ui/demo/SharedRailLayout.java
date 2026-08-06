@@ -14,8 +14,7 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav.SideRailNavRender
 public class SharedRailLayout extends AppNavLayout {
 
     public SharedRailLayout() {
-        super("Shared Rail");
-        addBrandContent(new Span("Shared Rail"));
+        addBranding(new Span("Shared Rail"));
         setTabletNavRenderer(SideRailNavRenderer::new);
     }
 }

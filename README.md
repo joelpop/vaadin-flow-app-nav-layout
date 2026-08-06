@@ -1,9 +1,11 @@
-# vaadin-flow-app-nav-layout
+# AppNavLayout (vaadin-flow-app-nav-layout)
 
-`AppNavLayout` is a Vaadin Flow base layout that automatically builds your application's navigation menuing system derived from annotations on your views. It adapts its navigation to the device: a bottom touch bar on phones, a side rail on tablets, a `SideNav` drawer on desktop. Building them by hand usually means maintaining three separate navigation components in sync with your routes, updated one by one whenever a view is added, moved, or renamed. `AppNavLayout` derives all three from the same `@Route`/`@Menu` metadata your views already declare, and switches between them live as the viewport changes — one navigation model, no per-device wiring to maintain.
+`AppNavLayout` is a mobile-friendly base layout for your Vaadin application. By default, it automatically generates your application's navigation menus from the `@Menu`, `@Route`, and `@PageTitle` annotations on your views. Out of the box, it uses a bottom touch bar on phones, a side rail on tablets, and a `SideNav` drawer on desktops. If you don't like any default, you can change it. For instance, if you prefer alternative titles, icons, or hierarchy than supplied by the defaults, you can provide your own replacement suppliers. And if need be, you can provide an entirely different menu system for any device/orientation combination.
 
 ## Table of Contents
 
+- [Getting Started](#getting-started)
+- [Features](#features)
 - [How it works](#how-it-works)
 - [Screenshots](#screenshots)
 - [Customization](#customization)
@@ -15,7 +17,159 @@
   - [Integration tests](#integration-tests)
 - [Publishing to Vaadin Directory](#publishing-to-vaadin-directory)
 
+## Getting Started
+
+You can get started with `AppNavLayout` by extending it with an empty layout subclass, then layer on progressively richer configuration as your application needs it.
+
+### Minimal setup
+
+`AppNavLayout` has no abstract methods, so an empty layout subclass is all you need:
+
+```java
+@Layout
+public class MainLayout extends AppNavLayout {
+}
+```
+
+This alone builds a full nav tree from your `@Route`/`@Menu`-annotated views — one item per view, with siblings sharing a path segment grouped automatically. It renders as whichever chrome fits the device (a bottom touch bar on phone, a side rail on tablet, or a `SideNav` drawer on desktop), with the current route's item highlighted as you navigate.
+
+### Supplying alternate icon and title generators
+
+If your views already carry their own alternative icon/title annotations instead of, or alongside, `@Menu`, wire `setViewIconGenerator`/`setViewTitleGenerator` in the constructor to read from them instead. Returning `null` for a given view falls back to the usual default — no icon, or `@Menu`'s own title.
+
+```java
+@Layout
+public class MainLayout extends AppNavLayout {
+
+    public MainLayout() {
+
+        setViewIconGenerator(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(ViewIcon.class))
+                .<Supplier<Icon>>map(a -> a.value()::create)
+                .orElse(null));
+
+        setViewTitleGenerator(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(PageTitle.class))
+                .map(PageTitle::value)
+                .orElse(null));
+    }
+}
+```
+
+Each generator is called again for every affected view whenever nav items are rebuilt — on every completed navigation, and, for the touch bar/rail, also whenever a resize or orientation change alters how many icons fit. It's safe to depend on state that can change over the layout's lifetime.
+
+### Supplying group icons and customizing nav groupings and titles
+
+By default, views are grouped and named by their `@Route` path name prefix. All views sharing the same path prefix are assigned to the same group. The last path segment name determines the name of the group (e.g. `catalog` becomes "Catalog" and `admin/usergroup` becomes "Usergroup") and, as there are no icons associated with route segments, the group has no icon to display.
+
+To explicitly assign views to groups and give groups alternate titles and icons, supply a `setViewNavGroupResolver` that returns your own `NavGroup` — built here from a custom `@MenuGroup` annotation on the view class:
+
+```java
+@Layout
+public class MainLayout extends AppNavLayout {
+
+    public MainLayout() {
+
+        setViewNavGroupResolver(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(MenuGroup.class))
+                .map(ann -> (NavGroup) new NavGroup() {
+                    public String title() { return ann.title(); }
+                    public Supplier<Icon> icon() { return ann.value()::create; }
+                    public NavGroup parent() { return null; }
+                })
+                .orElse(null));
+    }
+}
+```
+
+Like the generators above, the resolver is called again for every affected view whenever nav items are rebuilt, not once and cached.
+
+A sibling view sharing the same first path segment but returning a `null` `NavGroup` merges into that same group automatically, picking up its title and icon too. See [Nav grouping](#nav-grouping) for the full grouping rules, including the ordering this merge depends on.
+
+### Supplying a nav path matcher
+
+By default, touch/rail active-item highlighting matches the current path against each nav item with `String::equals`, so a parent item won't remain highlighted while a nested child route is active. Supplying a `setNavPathMatcher` can change that — the following highlights a nav item whenever the current path starts with its own path:
+
+```java
+@Layout
+public class MainLayout extends AppNavLayout {
+
+    public MainLayout() {
+
+        setViewIconGenerator(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(ViewIcon.class))
+                .<Supplier<Icon>>map(a -> a.value()::create)
+                .orElse(null));
+
+        setViewTitleGenerator(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(PageTitle.class))
+                .map(PageTitle::value)
+                .orElse(null));
+
+        setViewNavGroupResolver(m -> Optional.ofNullable(m.menuClass())
+                .map(v -> v.getAnnotation(MenuGroup.class))
+                .map(MenuGroup::value)
+                .orElse(null));
+
+        setNavPathMatcher((currentPath, navItemPath) -> {
+            var currentSegs = new Location(currentPath).getSegments();
+            var navItemSegs = new Location(navItemPath).getSegments();
+            return !navItemSegs.isEmpty()
+                    && currentSegs.size() >= navItemSegs.size()
+                    && currentSegs.subList(0, navItemSegs.size()).equals(navItemSegs);
+        });
+    }
+}
+```
+
+### Supplying brand content
+
+`addBranding(Component...)` places your own logo/title component in the brand area — the header on desktop, or the top of the drawer on mobile. Pass whatever fits your app: a heading, a logo image, or a composite of both; `AppNavLayout` doesn't presume a shape for it.
+
+```java
+@Layout
+public class MainLayout extends AppNavLayout {
+
+    public MainLayout(@Value("${spring.application.name:App}") String appName) {
+        addBranding(new H1(appName));
+    }
+}
+```
+
+The `@Value` annotation here is Spring's own property injection, reading `spring.application.name` and falling back to `"App"` if it's unset — one convenient source for the name, not something `AppNavLayout` requires; any string (or component) works.
+
+[Customization](#customization) covers what else can be overridden, and [API Reference](#api-reference) has the full setter/default listing.
+
+## Features
+
+### Automatic
+
+- **Device-adaptive nav chrome** — a bottom touch bar on phones, a permanent side rail on tablets (both orientations), and a `SideNav` drawer on desktop, switched to automatically based on touch capability and screen size.
+- **Live re-evaluation** — rotating a device, resizing a split-screen window, or any other viewport change re-picks the right nav type in place, with no page reload.
+- **Nav tree derived from your routes** — the entire nav tree comes from the `@Route`/`@Menu` metadata your views already declare; add, move, or rename a view and every nav surface (bar, rail, drawer) picks it up with no separate wiring.
+- **Automatic grouping** — sibling routes sharing a first path segment (e.g. `catalog/products`, `catalog/categories`) are grouped under an auto-labeled section with no group annotation of their own.
+- **Overflow handling** — when more root sections exist than fit a touch bar or rail, the excess collapses into a "More" popover automatically.
+- **Drill-down secondary nav** — nested routes get a two-level tab bar with a back button on touch/rail, kept in sync with the current route.
+- **Active-item highlighting** — the current route's nav item is highlighted consistently across all three nav types.
+- **Adaptive per-view header** — a view can contribute an icon+title (desktop) or an action component (desktop and mobile) to a header slot that reassembles itself on every navigation, via `HasViewHeaderTitle`/`HasViewHeaderComponent`.
+- **Theme-adaptive styling** — active nav items pick up whichever Vaadin theme is actually loaded (Lumo, Aura, or a properly authored custom theme) automatically, rather than a hardcoded color.
+- **Safe-area aware** — bar/rail icon capacity accounts for device notches, rounded corners, and home indicators, so nothing renders under an unsafe strip.
+
+### Customizable
+
+- **Custom icon/title/grouping** — drive labels, icons, and grouping from your own annotations instead of `@Menu`, via `setViewIconGenerator`/`setViewTitleGenerator`/`setViewNavGroupResolver`.
+- **Custom grouping strategy** — replace `PathPrefixNavGrouper` entirely with your own `NavGrouper`.
+- **Custom active-item matching** — override path matching (`setNavPathMatcher`) and nested-route match behavior (`setNavMatchNested`) for touch/rail highlighting.
+- **Per-scenario renderers** — independently swap the `NavRenderer` for any of the five device/orientation scenarios, or set both orientations of tablet/phone at once.
+- **Partial overrides** — subclass a built-in renderer to change just one behavior, e.g. `createOverflowComponent()` to replace the "More" popover with a chevron or swipeable strip.
+- **Custom `SideNavItem` rendering** — override `setNavNodeRenderer` for full control of the desktop drawer's item appearance.
+- **Configurable breakpoint** — adjust the physical-screen-size threshold that distinguishes tablet from phone (`setTabletMinShortSidePx`).
+- **Lifecycle hook** — react to nav-type changes via `onNavTypeChanged`/`NavTypeChangedEvent`.
+- **Escape hatch** — `addToNavbar()` for direct `AppLayout` access when nothing else fits.
+
 ## How it works
+
+Building them by hand usually means maintaining three separate navigation components in sync with your routes, updated one by one whenever a view is added, moved, or renamed. `AppNavLayout` derives all three from the same `@Route`/`@Menu` metadata your views already declare, and switches between them live as the viewport changes — one navigation model, no per-device wiring to maintain.
 
 `AppNavLayout` is a `Layout` subclass with no abstract methods, so the layout-side setup is just the class declaration itself:
 
@@ -50,27 +204,27 @@ See [Screenshots](#screenshots) for what this produces on each device, and [Cust
 <table>
 <tr>
 <td align="center" colspan="2">
-<img src="README-images/desktop.png" width="480"><br>
+<img src="README/default/desktop.png" width="480"><br>
 <sub><b>Desktop</b> — <code>SIDENAV</code> drawer</sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="40%">
-<img src="README-images/tablet-portrait.png" width="220"><br>
+<img src="README/default/tablet-portrait.png" width="220"><br>
 <sub><b>Tablet, portrait</b> — <code>RAIL</code></sub>
 </td>
 <td align="center">
-<img src="README-images/tablet-landscape.png" width="320"><br>
+<img src="README/default/tablet-landscape.png" width="320"><br>
 <sub><b>Tablet, landscape</b> — <code>RAIL</code></sub>
 </td>
 </tr>
 <tr>
 <td align="center">
-<img src="README-images/phone-portrait.png" width="140"><br>
+<img src="README/default/phone-portrait.png" width="140"><br>
 <sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a popover</sub>
 </td>
 <td align="center">
-<img src="README-images/phone-landscape.png" width="300"><br>
+<img src="README/default/phone-landscape.png" width="300"><br>
 <sub><b>Phone, landscape</b> — <code>TOUCH</code> bottom bar, wide enough that nothing overflows</sub>
 </td>
 </tr>
@@ -84,8 +238,8 @@ Every default can be overridden. For example, to drive icons, titles, and groupi
 @Layout
 public class MainLayout extends AppNavLayout {
 
-    public MainLayout(@Value("${spring.application.name:App}") String appTitle) {
-        super(appTitle);
+    public MainLayout(@Value("${spring.application.name:App}") String appName) {
+        addBranding(new H1(appName));
 
         setViewIconGenerator(m -> Optional.ofNullable(m.menuClass())
                 .map(v -> v.getAnnotation(ViewIcon.class))
@@ -109,8 +263,6 @@ public class MainLayout extends AppNavLayout {
                     && currentSegs.size() >= navItemSegs.size()
                     && currentSegs.subList(0, navItemSegs.size()).equals(navItemSegs);
         });
-
-        addBrandContent(new H1(getAppTitle()));
     }
 }
 ```

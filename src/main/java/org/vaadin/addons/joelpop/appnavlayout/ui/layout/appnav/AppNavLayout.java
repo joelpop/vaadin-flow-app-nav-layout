@@ -70,7 +70,7 @@ import java.util.function.Supplier;
  *
  * <p>Use the purpose-named methods to place adaptive content:
  * <ul>
- *   <li>{@link #addBrandContent} — header on desktop, drawer top on mobile</li>
+ *   <li>{@link #addBranding} — header on desktop, drawer top on mobile</li>
  *   <li>{@link #setUserMenu} — header trailing on desktop, drawer bottom on mobile</li>
  * </ul>
  *
@@ -100,7 +100,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
 
     private static final int DEFAULT_TABLET_MIN_SHORT_SIDE_PX = 768;
 
-    private String appTitle = "";
     private int tabletMinShortSidePx = DEFAULT_TABLET_MIN_SHORT_SIDE_PX;
     private DeviceType deviceType;
     // Tracked alongside deviceType (not just computed ad hoc inside the resize effect) so
@@ -123,7 +122,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     NavRenderer activeRenderer;
 
     // Buffered brand/user content — survives nav-type switches
-    final List<Component> bufferedBrandContent = new ArrayList<>();
+    final List<Component> bufferedBranding = new ArrayList<>();
     Component bufferedUserMenu;
 
     // Holds the Location of the most recent completed navigation; updated in afterNavigation().
@@ -177,8 +176,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private NavState navState = NavState.UNBUILT;
 
     /**
-     * Creates an {@code AppNavLayout} with an empty app title and the default renderers
-     * for each scenario (phone → touch, tablet → rail, desktop → sidenav).
+     * Creates an {@code AppNavLayout} with the default renderers for each scenario
+     * (phone → touch, tablet → rail, desktop → sidenav).
      */
     protected AppNavLayout() {
         super.setPrimarySection(Section.DRAWER);
@@ -210,17 +209,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         // Fires immediately with currentViewSignal == null, before any NavStrategy exists;
         // rebuildViewHeader() explicitly no-ops in that case (see its activeStrategy == null guard).
         Signal.effect(this, () -> rebuildViewHeader(currentViewSignal.get()));
-    }
-
-    /**
-     * Creates an {@code AppNavLayout} with the given app title and the default renderers
-     * for each scenario.
-     *
-     * @param appTitle text displayed in the navigation bar; pass an empty string for no title
-     */
-    protected AppNavLayout(String appTitle) {
-        this();
-        this.appTitle = appTitle;
     }
 
     // ——————————— Nav-type switching ————————————
@@ -280,7 +268,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void placeBrandAndUserContent() {
-        // No-op before nav is built (e.g. called from a subclass constructor via addBrandContent()/
+        // No-op before nav is built (e.g. called from a subclass constructor via addBranding()/
         // setUserMenu()); content is already buffered and gets placed by applyNavType() instead.
         if (navState == NavState.UNBUILT) {
             return;
@@ -332,8 +320,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      * Mobile: placed at the top of the navigation drawer.
      * Pass individual components; do not pre-wrap in a layout container.
      */
-    protected void addBrandContent(Component... components) {
-        Collections.addAll(bufferedBrandContent, components);
+    protected void addBranding(Component... components) {
+        Collections.addAll(bufferedBranding, components);
         placeBrandAndUserContent();
     }
 
@@ -648,11 +636,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         return addListener(NavTypeChangedEvent.class, listener);
     }
 
-    /** Application title supplied by the subclass. */
-    protected String getAppTitle() {
-        return appTitle;
-    }
-
     /**
      * Returns {@code true} if this session is using touch or rail nav (not desktop SideNav).
      *
@@ -716,12 +699,6 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
             orientation = detectOrientation(details);
             applyNavType();
         });
-        return this;
-    }
-
-    /** Updates the application title returned by {@link #getAppTitle()}. */
-    public AppNavLayout setAppTitle(String title) {
-        this.appTitle = title;
         return this;
     }
 

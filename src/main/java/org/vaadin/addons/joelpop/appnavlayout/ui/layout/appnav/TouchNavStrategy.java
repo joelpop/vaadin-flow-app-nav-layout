@@ -105,7 +105,7 @@ final class TouchNavStrategy implements NavStrategy {
     @Override
     public void placeBrandAndUserContent() {
         brandDrawerSlot.removeAll();
-        owner.bufferedBrandContent.forEach(brandDrawerSlot::add);
+        owner.bufferedBranding.forEach(brandDrawerSlot::add);
         userDrawerSlot.removeAll();
         if (owner.bufferedUserMenu != null) {
             userDrawerSlot.add(owner.bufferedUserMenu);

@@ -63,7 +63,7 @@ final class DesktopNavStrategy implements NavStrategy {
     @Override
     public void placeBrandAndUserContent() {
         brandContainer.removeAll();
-        owner.bufferedBrandContent.forEach(brandContainer::add);
+        owner.bufferedBranding.forEach(brandContainer::add);
         userContainer.removeAll();
         if (owner.bufferedUserMenu != null) {
             userContainer.add(owner.bufferedUserMenu);
