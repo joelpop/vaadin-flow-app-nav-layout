@@ -58,11 +58,12 @@ public final class RouteNavUtils {
     }
 
     /**
-     * Returns the {@code @Menu} title as the leaf display name.
-     * Falls back to the path when no title is present.
+     * Returns {@link MenuEntry#title()} as the leaf display name — already resolved by
+     * {@code MenuConfiguration.getMenuEntries()} itself (falling back through
+     * {@code @PageTitle} to the class name), so this doesn't add a fallback of its own.
      */
     public static String leafTitle(MenuEntry entry) {
-        return entry.title() != null ? entry.title() : normalizedPath(entry);
+        return entry.title();
     }
 
 }

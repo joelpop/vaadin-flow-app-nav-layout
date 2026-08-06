@@ -62,16 +62,14 @@ public final class NavNode {
     }
 
     /**
-     * Parses {@code @Menu(icon="...")} into an icon supplier. Expects the format
-     * {@code "collection:name"} (e.g. {@code "vaadin:home"}, matching {@link Icon}'s own
-     * collection/name constructor split on the first {@code ":"}). Returns {@code null} if
-     * {@code entry.icon()} is null/empty, or if it doesn't contain a {@code ":"} separator.
+     * Turns {@code @Menu(icon="...")} into an icon supplier, or {@code null} if
+     * {@code entry.icon()} is null/empty. {@link Icon}'s own single-{@code String}
+     * constructor already parses the {@code "collection:name"} format (and falls back to
+     * the {@code vaadin} collection if there's no {@code ":"}), so this doesn't reparse it.
      */
     private static Supplier<Icon> menuIcon(MenuEntry entry) {
         var s = entry.icon();
-        if (s == null || s.isEmpty()) return null;
-        var parts = s.split(":", 2);
-        return parts.length == 2 ? () -> new Icon(parts[0], parts[1]) : null;
+        return (s == null || s.isEmpty()) ? null : () -> new Icon(s);
     }
 
     /** Display title for this node. */

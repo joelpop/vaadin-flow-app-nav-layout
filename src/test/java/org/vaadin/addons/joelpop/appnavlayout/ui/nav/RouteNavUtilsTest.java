@@ -59,14 +59,9 @@ class RouteNavUtilsTest {
     // ——————————— leafTitle ————————————
 
     @Test
-    void leafTitleUsesMenuTitleWhenPresent() {
+    void leafTitleReturnsMenuEntryTitleAsIs() {
+        // MenuConfiguration.getMenuEntries() already resolves this (through @PageTitle, then
+        // the class name) before this add-on ever sees it — leafTitle adds no fallback of its own.
         assertEquals("Products", RouteNavUtils.leafTitle(entry("/catalog/products", "Products")));
-    }
-
-    @Test
-    void leafTitleFallsBackToNormalizedPathWhenTitleIsNull() {
-        // Regression test: must not fall back to the raw entry.path(), which includes a
-        // leading slash (e.g. "/catalog/products" instead of "catalog/products").
-        assertEquals("catalog/products", RouteNavUtils.leafTitle(entry("/catalog/products", null)));
     }
 }

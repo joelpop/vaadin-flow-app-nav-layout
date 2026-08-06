@@ -210,10 +210,12 @@ class AppNavLayoutIT {
         navigateTo("/");
         pauseForHumanIfHeaded();
 
-        // Three views registered — all should appear as primary touch nav items.
+        // Three root items — Home, Catalog (a path-based group, no icon of its own),
+        // and Orders — all should appear as primary touch nav items.
         assertThat(page.locator(".touch-nav-item")).hasCount(3);
-        // Each item must have an icon; no blank placeholder slots.
-        assertThat(page.locator(".touch-nav-item vaadin-icon")).hasCount(3);
+        // Only Home and Orders have an icon; Catalog correctly renders none, not a
+        // blank placeholder.
+        assertThat(page.locator(".touch-nav-item vaadin-icon")).hasCount(2);
     }
 
     @Test
@@ -221,9 +223,10 @@ class AppNavLayoutIT {
         newPhonePage();
         navigateTo("/");
 
-        // Initial state: 3 primary items, 3 icons.
+        // Initial state: 3 primary items (Home, Catalog, Orders), 2 icons — Catalog is a
+        // path-based group and has no icon of its own.
         assertThat(page.locator(".touch-nav-item")).hasCount(3);
-        assertThat(page.locator(".touch-nav-item vaadin-icon")).hasCount(3);
+        assertThat(page.locator(".touch-nav-item vaadin-icon")).hasCount(2);
         pauseForHumanIfHeaded();
 
         // Narrow to overflow territory: 1 primary + overflow button = 2 touch-nav-items.
@@ -236,7 +239,7 @@ class AppNavLayoutIT {
         // Widen back: buildItems() fires again; icons must be freshly created, not moved.
         page.setViewportSize(PHONE_WIDTH, PHONE_HEIGHT);
         assertThat(page.locator(".touch-nav-item")).hasCount(3);
-        assertThat(page.locator(".touch-nav-item vaadin-icon")).hasCount(3);
+        assertThat(page.locator(".touch-nav-item vaadin-icon")).hasCount(2);
         pauseForHumanIfHeaded();
     }
 

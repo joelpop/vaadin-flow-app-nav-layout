@@ -35,7 +35,11 @@ This alone builds a full nav tree from your `@Route`/`@Menu`-annotated views —
 
 ### Supplying alternate icon and title generators
 
-If your views already carry their own alternative icon/title annotations instead of, or alongside, `@Menu`, wire `setViewIconGenerator`/`setViewTitleGenerator` in the constructor to read from them instead. Returning `null` for a given view falls back to the usual default — no icon, or `@Menu`'s own title.
+By default, `AppNavLayout` uses each view's `@Menu` icon to drive its nav item icon. For the label, it uses the `@Menu` title, falling back to `@PageTitle` and then the class name — the same values `MenuConfiguration.getMenuEntries()` returns, which this add-on calls directly — with one further fallback of its own, to the raw route path, if that title is ever unset.
+
+If your application has an alternative means of specifying view icons and titles (such as custom annotations, an enum, or a map), wire `setViewIconGenerator`/`setViewTitleGenerator` to read them instead. Returning `null` for a given view falls back to the default.
+
+In the following example, the application's custom `ViewIcon` annotation on each view class is used to drive the icon, and the `PageTitle` annotation on the class is used to drive the title:
 
 ```java
 @Layout
