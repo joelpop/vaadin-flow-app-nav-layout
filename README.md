@@ -260,35 +260,13 @@ The `@Value` annotation here is Spring's own property injection, reading `spring
 
 ## How it works
 
-Building them by hand usually means maintaining three separate navigation components in sync with your routes, updated one by one whenever a view is added, moved, or renamed. `AppNavLayout` derives all three from the same `@Route`/`@Menu` metadata your views already declare, and switches between them live as the viewport changes — one navigation model, no per-device wiring to maintain.
+`AppNavLayout` extends Vaadin's `AppLayout` and uses its standard `navbar-bottom` slot for both the touch bar and the rail. `RAIL` mode repositions and restyles it via CSS keyed on a `nav-rail` attribute `AppNavLayout` sets on itself. Because it's the standard `AppLayout` slot and not a bespoke part, any other component that already understands `AppLayout`'s own `navbar-top`/`navbar-bottom` contract interoperates with rail mode automatically, with no special-casing needed on its part.
 
-`AppNavLayout` is a `Layout` subclass with no abstract methods, so the layout-side setup is just the class declaration itself:
+`AppNavLayout` builds one nav tree from your routes, then hands that same tree to a different renderer depending on the device. The tree itself — a graph of `NavNode`s built by whichever `NavGrouper` is configured — has no idea what device it'll be shown on; the two decisions are made independently and only combined at render time. That's what lets a `SideNav` drawer, a touch bottom bar, and a side rail all stay in sync with the same routes without three separate components to maintain.
 
-```java
-@Layout
-public class MainLayout extends AppNavLayout {
-}
-```
+`AppNavLayout` distinguishes five device/orientation scenarios (desktop, tablet portrait, tablet landscape, phone portrait, phone landscape), each with its own configurable `NavRenderer`. On attach, it reads touch capability and screen size to resolve the current scenario, which determines both the `NavRenderer` and the `NavType` it declares (`SIDENAV`, `RAIL`, or `TOUCH`) — `SIDENAV` builds a `DesktopNavStrategy` (a full `SideNav` in the drawer), `RAIL`/`TOUCH` build a `TouchNavStrategy` (an icon bar or rail, plus a two-level drill-down header for nested routes). A `Signal.effect` on the window size re-evaluates this on every rotation or resize, swapping chrome in place with no page reload — though if the newly-resolved scenario still points at the same `NavRenderer` instance as before (tablet's two orientations share one by default), nothing tears down and rebuilds; only the item count/layout inside that renderer adjusts.
 
-Every adaptive nav component — touch bar, rail, side nav — is built and kept in sync from Vaadin's own `@Route`/`@Menu`-annotated views, the same metadata `MenuConfiguration` already exposes for any Vaadin router. A view's `@Menu` title, icon, and order become its label, icon, and position in whichever nav type is currently active, with no separate wiring per nav type:
-
-```java
-@Route("")
-@Menu(title = "Home", icon = "vaadin:home", order = 1)
-public class HomeView extends Div {
-}
-```
-
-Grouping likewise falls directly out of the route structure: `PathPrefixNavGrouper`, the default `NavGrouper`, nests a view under whichever other view shares its first `@Route` path segment, labeling the group from that segment. A view routed at `catalog/products` therefore lands under an auto-labeled "Catalog" section alongside any sibling `catalog/...` view, without a group annotation of its own:
-
-```java
-@Route("catalog/products")
-@Menu(title = "Products", order = 2)
-public class ProductsView extends Div {
-}
-```
-
-See [Screenshots](#screenshots) for what this produces on each device, and [Customization](#customization) for how each of these defaults can be overridden.
+See [Getting Started](#getting-started) for configuring each of these pieces, and [API Reference](#api-reference) for the full `NavRenderer`/`NavStrategy`/`NavType` picture.
 
 ## Screenshots
 
