@@ -33,13 +33,49 @@ public class MainLayout extends AppNavLayout {
 
 This alone builds a full nav tree from your `@Route`/`@Menu`-annotated views — one item per view, with siblings sharing a path segment grouped automatically. It renders as whichever chrome fits the device (a bottom touch bar on phone, a side rail on tablet, or a `SideNav` drawer on desktop), with the current route's item highlighted as you navigate.
 
-### Supplying alternate icon and title generators
+### Menu icons and titles
 
-By default, `AppNavLayout` uses each view's `@Menu` icon to drive its nav item icon. For the label, it uses the `@Menu` title, falling back to `@PageTitle` and then the class name — the same values `MenuConfiguration.getMenuEntries()` returns, which this add-on calls directly — with one further fallback of its own, to the raw route path, if that title is ever unset.
+Each nav item needs a label and wants an icon.
 
-If your application has an alternative means of specifying view icons and titles (such as custom annotations, an enum, or a map), wire `setViewIconGenerator`/`setViewTitleGenerator` to read them instead. Returning `null` for a given view falls back to the default.
+#### Default behavior
 
-In the following example, the application's custom `ViewIcon` annotation on each view class is used to drive the icon, and the `PageTitle` annotation on the class is used to drive the title:
+By default, `AppNavLayout` calls Vaadin's `MenuConfiguration.getMenuEntries()` to retrieve the labels and icons from each view's `@Menu` annotation. If a `@Menu` annotation doesn't supply a title, first the `@PageTitle` and then the view class name are used as fallbacks.
+
+So the simplest possible setup is to add `@Menu` annotations to your views:
+
+```java
+@Route("catalog/products")
+@Menu(title = "Products", icon = "vaadin:package")
+public class ProductsView extends Div {
+}
+```
+
+This produces a nav item with the label "Products" and the "package" icon from the `vaadin` icon set.
+
+#### Supplying alternate icon and title generators
+
+If your application has an alternative means of specifying view icons and titles (such as custom view annotations, an enum, or a map), wire `setViewIconGenerator`/`setViewTitleGenerator` to read them instead. Returning `null` for a given view falls back to the above default.
+
+In the following example, each view carries its own `@ViewIcon` and prioritizes `@PageTitle` annotations instead of `@Menu`'s:
+
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ViewIcon {
+    VaadinIcon value();
+}
+```
+
+```java
+@Route("catalog/products")
+@Menu
+@PageTitle("Products")
+@ViewIcon(VaadinIcon.PACKAGE)
+public class ProductsView extends Div {
+}
+```
+
+`MainLayout` reads those annotations to drive the icon and title:
 
 ```java
 @Layout
@@ -502,7 +538,7 @@ Stateless static helpers.
 | `pathSegments(String routePath)`    | Path segments as an immutable list; empty path (e.g. root `""`) returns `List.of()`, not a list containing one empty string. |
 | `normalizedPath(MenuEntry entry)`   | `entry.path()` with any leading `/` stripped.                                                                                |
 | `routeSegmentLabel(String segment)` | Capitalizes each hyphen-delimited word, e.g. `"audit-log"` → `"Audit Log"`.                                                  |
-| `leafTitle(MenuEntry entry)`        | `@Menu` title, falling back to `normalizedPath(entry)` when absent.                                                          |
+| `leafTitle(MenuEntry entry)`        | `entry.title()` as-is — already resolved by `MenuConfiguration.getMenuEntries()` (`@Menu` title, falling back to `@PageTitle`, then the class name); adds no fallback of its own. |
 
 #### `NavType`, `DeviceType`, `Orientation` (enums)
 
