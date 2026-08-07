@@ -24,16 +24,22 @@ import java.util.function.Supplier;
  * processed by {@link #nodeFor} before any path-based views are processed.
  *
  * <p>Group nodes are cached so the same {@link NavNode} instance is returned for
- * the same group identity across multiple {@link #nodeFor} calls.
+ * the same group identity across multiple {@link #nodeFor} calls. Group identity for a
+ * {@link NavGroup} resolver is its {@code (parent, title())} pair, not the resolved
+ * {@link NavGroup} object itself — {@link NavGroup} declares no {@code equals()}, and a
+ * resolver that (as is natural) builds a fresh instance per call would otherwise never
+ * merge two siblings resolving to the same group.
  */
 public final class PathPrefixNavGrouper implements NavGrouper {
 
     private Function<MenuEntry, NavGroup>       navGroupDefResolver = e -> null;
     private Function<MenuEntry, Supplier<Icon>> viewIconGenerator   = e -> null;
 
-    private final Map<String, NavNode> cache            = new LinkedHashMap<>();
-    private final Map<NavGroup, NavNode> defCache        = new LinkedHashMap<>();
-    private final Map<String, NavNode>   firstSegToDefRoot = new LinkedHashMap<>();
+    private record DefKey(NavNode parent, String title) {}
+
+    private final Map<String, NavNode> cache             = new LinkedHashMap<>();
+    private final Map<DefKey, NavNode> defCache          = new LinkedHashMap<>();
+    private final Map<String, NavNode> firstSegToDefRoot = new LinkedHashMap<>();
 
     /** Sets the resolver that maps a {@link MenuEntry} to its {@link NavGroup}; return {@code null} to use path-based grouping. */
     public PathPrefixNavGrouper setNavGroupDefResolver(Function<MenuEntry, NavGroup> resolver) {
@@ -100,12 +106,10 @@ public final class PathPrefixNavGrouper implements NavGrouper {
     }
 
     private NavNode defGroupNode(NavGroup def) {
-        return defCache.computeIfAbsent(def, d -> {
-            var parent = d.parent() != null ? defGroupNode(d.parent()) : null;
-            return parent != null
-                    ? NavNode.of(d.title(), d.icon(), parent)
-                    : NavNode.of(d.title(), d.icon());
-        });
+        var parent = def.parent() != null ? defGroupNode(def.parent()) : null;
+        return defCache.computeIfAbsent(new DefKey(parent, def.title()), k -> parent != null
+                ? NavNode.of(def.title(), def.icon(), parent)
+                : NavNode.of(def.title(), def.icon()));
     }
 
 }

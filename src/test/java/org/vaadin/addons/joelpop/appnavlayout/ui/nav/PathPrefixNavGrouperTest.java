@@ -16,6 +16,19 @@ class PathPrefixNavGrouperTest {
 
     private record Group(String title, Supplier<Icon> icon, NavGroup parent) implements NavGroup {}
 
+    /**
+     * Returns a fresh {@link NavGroup} instance on every call, with no {@code equals()}
+     * override — mirroring the anonymous-class-per-resolver-call pattern the README
+     * documents, where group identity can't rely on the resolved object's own identity.
+     */
+    private static NavGroup freshGroup(String title, NavGroup parent) {
+        return new NavGroup() {
+            public String title() { return title; }
+            public Supplier<Icon> icon() { return null; }
+            public NavGroup parent() { return parent; }
+        };
+    }
+
     private static MenuEntry entry(String path) {
         return new MenuEntry(path, null, null, null, Div.class);
     }
@@ -83,6 +96,49 @@ class PathPrefixNavGrouperTest {
 
         assertSame(explicit.parent().orElseThrow(), pathOnly.parent().orElseThrow(),
                 "a path-based sibling of an explicitly-grouped view must merge into the same group");
+    }
+
+    @Test
+    void siblingsResolvingToEqualButDistinctNavGroupInstancesMergeIntoOneNode() {
+        // A resolver naturally builds a fresh NavGroup instance per call (e.g. reading an
+        // annotation and wrapping it inline). Group identity must not depend on that
+        // instance's object identity, or every sibling would land in its own group.
+        var grouper = new PathPrefixNavGrouper().setNavGroupDefResolver(e -> freshGroup("Catalog", null));
+
+        var products = grouper.nodeFor(entry("catalog/products"));
+        var categories = grouper.nodeFor(entry("catalog/categories"));
+
+        assertSame(products.parent().orElseThrow(), categories.parent().orElseThrow(),
+                "siblings resolving to equal but distinct NavGroup instances must merge into the same group NavNode");
+    }
+
+    @Test
+    void siblingsResolvingToNavGroupsWithDifferentTitlesProduceSeparateNodes() {
+        var grouper = new PathPrefixNavGrouper().setNavGroupDefResolver(e ->
+                RouteNavUtils.normalizedPath(e).endsWith("products")
+                        ? freshGroup("Catalog", null)
+                        : freshGroup("Katalog", null));
+
+        var products = grouper.nodeFor(entry("catalog/products"));
+        var categories = grouper.nodeFor(entry("catalog/categories"));
+
+        assertNotSame(products.parent().orElseThrow(), categories.parent().orElseThrow());
+        assertEquals("Catalog", products.parent().orElseThrow().title());
+        assertEquals("Katalog", categories.parent().orElseThrow().title());
+    }
+
+    @Test
+    void nestedGroupsResolvingToEqualButDistinctNavGroupInstancesMergeAtEachLevel() {
+        var grouper = new PathPrefixNavGrouper().setNavGroupDefResolver(e -> freshGroup("Users", freshGroup("Admin", null)));
+
+        var list = grouper.nodeFor(entry("admin/users/list"));
+        var edit = grouper.nodeFor(entry("admin/users/edit"));
+
+        var listParent = list.parent().orElseThrow();
+        var editParent = edit.parent().orElseThrow();
+        assertSame(listParent, editParent,
+                "nested group nodes must merge across calls even when each call builds fresh NavGroup instances");
+        assertSame(listParent.parent().orElseThrow(), editParent.parent().orElseThrow());
     }
 
     @Test
