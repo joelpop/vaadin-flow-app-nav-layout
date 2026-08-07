@@ -56,7 +56,7 @@ This produces a nav item with the label "Products" and the "package" icon from t
 
 If your application has an alternative means of specifying view icons and titles (such as custom view annotations, an enum, or a map), wire `setViewIconGenerator`/`setViewTitleGenerator` to read them instead. Returning `null` for a given view falls back to the above default.
 
-In the following example, each view carries its own `@ViewIcon` and prioritizes `@PageTitle` annotations instead of `@Menu`'s:
+In the following example, each view carries its own custom `@ViewIcon` annotations and prioritizes `@PageTitle` over that of `@Menu`'s title:
 
 ```java
 @Target(ElementType.TYPE)
@@ -96,13 +96,56 @@ public class MainLayout extends AppNavLayout {
 }
 ```
 
-Each generator is called again for every affected view whenever nav items are rebuilt — on every completed navigation, and, for the touch bar/rail, also whenever a resize or orientation change alters how many icons fit. It's safe to depend on state that can change over the layout's lifetime.
+Each generator is called for every affected view whenever nav items are rebuilt — on every completed navigation, and, for the touch bar/rail, also whenever a resize or orientation change alters how many icons fit. It's safe to depend on state that can change over the layout's lifetime.
 
-### Supplying group icons and customizing nav groupings and titles
+### Nav groups
 
-By default, views are grouped and named by their `@Route` path name prefix. All views sharing the same path prefix are assigned to the same group. The last path segment name determines the name of the group (e.g. `catalog` becomes "Catalog" and `admin/usergroup` becomes "Usergroup") and, as there are no icons associated with route segments, the group has no icon to display.
+Sibling views under the same route path prefix are naturally related — a nav group ties them together under one label.
 
-To explicitly assign views to groups and give groups alternate titles and icons, supply a `setViewNavGroupResolver` that returns your own `NavGroup` — built here from a custom `@MenuGroup` annotation on the view class:
+#### Default behavior
+
+No additional annotation is needed for basic grouping: views sharing the same `@Route` path prefix are grouped automatically, labeled with the final segment of the prefix. The group has no icon, since route path prefixes don't carry one.
+
+```java
+@Route("catalog/products")
+@Menu(title = "Products", icon = "vaadin:package")
+public class ProductsView extends Div {
+}
+```
+
+```java
+@Route("catalog/categories")
+@Menu(title = "Categories", icon = "vaadin:tags")
+public class CategoriesView extends Div {
+}
+```
+
+This produces a "Catalog" group — labeled from the `catalog` path segment — containing "Products" and "Categories".
+
+#### Supplying custom nav groups
+
+To assign a view to a group explicitly, independent of its route path, or to give a group a title and icon, supply a `setViewNavGroupResolver` that returns a `NavGroup` identifying the view's group membership.
+
+In the following example, each view carries its own custom `@MenuGroup` annotation:
+
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface MenuGroup {
+    String title();
+    VaadinIcon value();
+}
+```
+
+```java
+@Route("catalog/products")
+@Menu(title = "Products", icon = "vaadin:package")
+@MenuGroup(title = "Catalog", value = VaadinIcon.PACKAGE)
+public class ProductsView extends Div {
+}
+```
+
+`MainLayout` reads that annotation to build the group. `NavGroup` can't be implemented directly on an annotation (annotation elements can only be primitives, `String`, `Class`, enums, other annotations, or arrays of those), so it's built as an anonymous class from the annotation's values:
 
 ```java
 @Layout
@@ -122,34 +165,42 @@ public class MainLayout extends AppNavLayout {
 }
 ```
 
-Like the generators above, the resolver is called again for every affected view whenever nav items are rebuilt, not once and cached.
+Like the generators above, the resolver is called for every affected view whenever nav items are rebuilt, not once and cached.
 
 A sibling view sharing the same first path segment but returning a `null` `NavGroup` merges into that same group automatically, picking up its title and icon too. See [Nav grouping](#nav-grouping) for the full grouping rules, including the ordering this merge depends on.
 
-### Supplying a nav path matcher
+### Active-item highlighting
 
-By default, touch/rail active-item highlighting matches the current path against each nav item with `String::equals`, so a parent item won't remain highlighted while a nested child route is active. Supplying a `setNavPathMatcher` can change that — the following highlights a nav item whenever the current path starts with its own path:
+Touch/rail nav items need to know which one counts as "active" for the current route.
+
+#### Default behavior
+
+By default, `AppNavLayout` matches the current path against each nav item with `String::equals` — an item is active only on an exact match, so a parent item won't stay highlighted while a nested child route beneath it is active:
+
+```java
+@Route("catalog/products")
+@Menu(title = "Products", icon = "vaadin:package")
+public class ProductsView extends Div {
+}
+```
+
+```java
+@Route("catalog/products/detail")
+public class ProductDetailView extends Div {
+}
+```
+
+Navigating to `catalog/products/detail` leaves "Products" unhighlighted, since that path doesn't equal `catalog/products`.
+
+#### Supplying a nav path matcher
+
+To keep a parent item highlighted while its own nested routes are active, supply a `setNavPathMatcher` — the following highlights a nav item whenever the current path starts with its own path:
 
 ```java
 @Layout
 public class MainLayout extends AppNavLayout {
 
     public MainLayout() {
-
-        setViewIconGenerator(m -> Optional.ofNullable(m.menuClass())
-                .map(v -> v.getAnnotation(ViewIcon.class))
-                .<Supplier<Icon>>map(a -> a.value()::create)
-                .orElse(null));
-
-        setViewTitleGenerator(m -> Optional.ofNullable(m.menuClass())
-                .map(v -> v.getAnnotation(PageTitle.class))
-                .map(PageTitle::value)
-                .orElse(null));
-
-        setViewNavGroupResolver(m -> Optional.ofNullable(m.menuClass())
-                .map(v -> v.getAnnotation(MenuGroup.class))
-                .map(MenuGroup::value)
-                .orElse(null));
 
         setNavPathMatcher((currentPath, navItemPath) -> {
             var currentSegs = new Location(currentPath).getSegments();
