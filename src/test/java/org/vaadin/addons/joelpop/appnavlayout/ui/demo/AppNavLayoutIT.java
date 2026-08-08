@@ -219,6 +219,18 @@ class AppNavLayoutIT {
     }
 
     @Test
+    void touchNavRootItemsFollowMenuOrderNotAlphabeticalOrder() {
+        // Home (@Menu order=1), Catalog (order=2.1 via its Products child), Orders (order=3).
+        // Alphabetically "Catalog" < "Home" < "Orders", so this only passes if root order comes
+        // from @Menu's order value rather than falling back to alphabetical/registration order.
+        newPhonePage();
+        navigateTo("/");
+        pauseForHumanIfHeaded();
+
+        assertThat(page.locator(".touch-nav-label")).hasText(new String[] {"Home", "Catalog", "Orders"});
+    }
+
+    @Test
     void touchNavIconsRemainCorrectAfterNavBarRebuild() {
         newPhonePage();
         navigateTo("/");
@@ -302,6 +314,26 @@ class AppNavLayoutIT {
         assertThat(page.locator("vaadin-side-nav")).isVisible();
         // Home, Catalog group (+ Products and Categories children), Orders = 5 items.
         assertThat(page.locator("vaadin-side-nav-item")).hasCount(5);
+    }
+
+    @Test
+    void sideNavLeafItemsFollowMenuOrderNotAlphabeticalOrder() {
+        // Home (order=1), Products (order=2.1), Categories (order=2.2), Orders (order=3).
+        // Products and Categories share the "catalog" path prefix, so this also proves order
+        // controls placement *within* a group, not just which group comes first — alphabetically
+        // "Categories" < "Products", so this only passes if sibling order comes from @Menu's
+        // order value rather than alphabetical or path-segment order. Leaf items only
+        // (vaadin-side-nav-item[path]) excludes the "Catalog" group header itself, which has no
+        // path of its own.
+        page.setViewportSize(DESKTOP_WIDTH, DESKTOP_HEIGHT);
+        navigateTo("/");
+        pauseForHumanIfHeaded();
+
+        // The label is SideNavItem's own light-DOM text child (no wrapping element), and the
+        // item's combined text also includes its hidden "Toggle child items" a11y text, so this
+        // uses containsText() (substring per element) rather than an exact hasText() match.
+        assertThat(page.locator("vaadin-side-nav-item[path]"))
+                .containsText(new String[] {"Home", "Products", "Categories", "Orders"});
     }
 
     @Test

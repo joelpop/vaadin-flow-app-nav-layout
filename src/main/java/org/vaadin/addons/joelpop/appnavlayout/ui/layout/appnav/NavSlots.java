@@ -9,10 +9,10 @@ import com.vaadin.flow.component.HasComponents;
  */
 public interface NavSlots {
 
-    /** The desktop/landscape-tablet nav location, inside the drawer. */
+    /** The desktop nav location, inside the drawer. */
     HasComponents drawer();
 
-    /** The portrait-tablet nav location, the left-edge rail. */
+    /** The tablet nav location (both orientations, by default), the left-edge rail. */
     HasComponents sideRail();
 
     /** The phone nav location, the bottom bar. */
