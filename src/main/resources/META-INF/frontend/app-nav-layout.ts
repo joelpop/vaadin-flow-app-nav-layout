@@ -206,6 +206,14 @@ GLOBAL_STYLES.replaceSync(`
         min-width: 0;
     }
 
+    /* Stands in for the icon on a section that has none, at the same 20px footprint
+       AbstractTouchNavRenderer.navItem gives a real icon — see that method's own comment for why
+       this needs to take up the same space rather than being left out. */
+    .touch-nav-icon-placeholder {
+        width: 20px;
+        height: 20px;
+    }
+
     .touch-nav-label {
         /* No generic --vaadin-font-size-* scale exists (typography isn't part of the base
            design-token set — see file header), so a plain literal value is used here. */

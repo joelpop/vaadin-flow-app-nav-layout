@@ -139,7 +139,12 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
             else {
                 bar.setWidthFull();
                 bar.setJustifyContentMode(FlexComponent.JustifyContentMode.EVENLY);
-                bar.setAlignItems(FlexComponent.Alignment.BASELINE);
+                // STRETCH, not BASELINE — every item is the same height regardless of whether its
+                // NavNode has an icon (navItem's placeholder keeps that true), so there's nothing
+                // left for BASELINE to align by content shape; STRETCH is what the column/rail
+                // branch above already uses, for the same "don't rely on flex's own per-item
+                // baseline computation" reasoning.
+                bar.setAlignItems(FlexComponent.Alignment.STRETCH);
             }
             var page = UI.getCurrent().getPage();
             Signal.effect(bar, () -> {
@@ -274,14 +279,26 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         // Button lacks HasComponents and setText(String) only appends a raw text node (no
         // element to attach the label's own styling to), so icon+label are composed in a plain
         // Div passed as the button's "icon" content instead — see app-nav-layout.ts's
-        // "touch-nav-content" rule for the resulting layout. icon is left out entirely (rather
-        // than falling back to a placeholder glyph) when a section has none, matching
-        // SideNavItem's own icon.ifPresent(...) behavior in AppNavLayout.defaultNavNodeRenderer.
+        // "touch-nav-content" rule for the resulting layout. Button's own height is fit-content
+        // around whatever this Div contains (see vaadin-button-base-styles.js: ":host { height:
+        // var(--vaadin-button-height, fit-content) }"), so a section with no icon always gets an
+        // icon-sized *empty* placeholder here instead of leaving the icon out entirely — omitting
+        // it (the previous behavior, matching SideNavItem's own icon.ifPresent(...)) made that
+        // item's whole button shorter than its icon-bearing siblings, shifting its label to a
+        // different vertical position — confirmed live: an icon-less item's label sat 24px higher
+        // than its siblings'. A visible placeholder glyph would misrepresent the item as having an
+        // icon; an empty same-footprint box keeps every item's height (and thus its label's
+        // position) identical without implying one.
         var content = new Div(titleSpan);
         content.addClassName("touch-nav-content");
         if (icon != null) {
             icon.setSize("20px");
             content.addComponentAsFirst(icon);
+        }
+        else {
+            var placeholder = new Div();
+            placeholder.addClassName("touch-nav-icon-placeholder");
+            content.addComponentAsFirst(placeholder);
         }
 
         var item = createNavButton(content, viewClass);

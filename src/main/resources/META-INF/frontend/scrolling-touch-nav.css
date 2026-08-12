@@ -1,0 +1,71 @@
+/* Chevrons fade in/out via opacity. position:absolute means display:flex has no layout impact.
+   Color comes from the Button's own theme="tertiary" styling, not a rule here. No height
+   override here at all — ScrollingTouchNavRenderer builds the chevron with the exact same
+   icon+label-placeholder structure as a regular nav item, so its height already matches one
+   under whatever theme is active without this add-on needing to know or guess what that height
+   actually is. padding/min-width are reset the same way .touch-nav-item resets them for a
+   regular item (see app-nav-layout.ts) — applied directly here rather than by also giving the
+   chevron the "touch-nav-item" class itself, since that class's own :not(.active) rule would
+   permanently mute the chevron's color (it never becomes .active — it isn't a route item). */
+.scrolling-touch-nav-chevron-left,
+.scrolling-touch-nav-chevron-right {
+    display: flex;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    padding: 0;
+    min-width: 0;
+}
+
+/* Reserves a real label's line-box height (see ScrollingTouchNavRenderer's own comment) without
+   ever painting anything. */
+.touch-nav-label-placeholder {
+    visibility: hidden;
+}
+
+/* Show right chevron when there is overflow and the bar is not scrolled to the end. */
+.scrolling-touch-nav-has-overflow:not(.scrolling-touch-nav-at-end) .scrolling-touch-nav-chevron-right {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Show left chevron when the bar has been scrolled away from the start. */
+.scrolling-touch-nav-scrolled .scrolling-touch-nav-chevron-left {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Gradient backgrounds that fade bar content behind each chevron. */
+.scrolling-touch-nav-chevron-left {
+    background: linear-gradient(to right, var(--vaadin-background-container) 50%, transparent);
+}
+
+.scrolling-touch-nav-chevron-right {
+    background: linear-gradient(to left, var(--vaadin-background-container) 50%, transparent);
+}
+
+/* Prevent vertical drags anywhere on the wrapper (bar or chevrons) from triggering page scroll. */
+.scrolling-touch-nav-wrapper {
+    touch-action: pan-x;
+}
+
+/* touch-action is not inherited — every element defaults to auto, which allows y-pan.
+   The bar and wrapper declaring pan-x is not sufficient; iOS evaluates the touch-action
+   of the element the touch actually lands on. Every descendant must also declare pan-x
+   so that no touch anywhere in this area can initiate a y-pan toward the page. */
+.scrolling-touch-nav *,
+.scrolling-touch-nav-chevron-left,
+.scrolling-touch-nav-chevron-right,
+.scrolling-touch-nav-chevron-left *,
+.scrolling-touch-nav-chevron-right * {
+    touch-action: pan-x;
+}
+
+/* Prevent horizontal overscroll from chaining up to the page. */
+.scrolling-touch-nav {
+    overscroll-behavior-x: contain;
+}
+
+.scrolling-touch-nav::-webkit-scrollbar {
+    display: none;
+}

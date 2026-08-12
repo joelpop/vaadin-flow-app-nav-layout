@@ -1,0 +1,25 @@
+/*
+ * Expanding touch nav — column flex, slot grows upward to include the chevron row.
+ *
+ * Column layout (top to bottom): chevron row → primary nav-bar → overflow section.
+ * The slot extends upward to accommodate all three; the primary items sit above the
+ * overflow rows, which grow below them when expanded.
+ */
+.expanding-touch-nav {
+    width: 100%;
+}
+
+.expanding-touch-nav-chevron-row {
+    display: flex;
+    justify-content: center;
+}
+
+.expanding-touch-nav-overflow {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+}
+
+.expanding-touch-nav.expanded .expanding-touch-nav-overflow {
+    max-height: 40vh;
+}

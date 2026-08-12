@@ -6,9 +6,9 @@
 
     <groupId>org.vaadin.addons.joelpop</groupId>
     <artifactId>flow-app-nav-layout</artifactId>
-    <version>25.1.0</version>
+    <version>25.1.1</version>
     <name>App Nav Layout for Vaadin Flow</name>
-    <description>Opinionated responsive navigation sidebar layout for Vaadin applications</description>
+    <description>An adaptive desktop/tablet/phone navigation sidebar layout for Vaadin applications</description>
 
     <properties>
         <vaadin.version>25.1.9</vaadin.version>
