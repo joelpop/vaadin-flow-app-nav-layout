@@ -12,17 +12,12 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
-import com.vaadin.flow.router.Location;
-import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.shared.Registration;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -105,12 +100,18 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
         container.removeAll();
         setExpanded(false);
 
-        var rootNodes = collectRootNodes(context);
+        var rootNodes = RootNavSupport.collectRootNodes(context);
         // Floor to nearest even number so the grid always has symmetric columns.
         var n = Math.max(2, (windowWidth / ITEM_PX) & ~1);
 
         var primaryBar = new FlexLayout();
         primaryBar.addClassName("nav-bar");
+        // Explicit, not relying on the flex default (which computes to the same thing) — every
+        // item is the same height regardless of whether its NavNode has an icon (see
+        // createNavButton's own comment), so there's nothing left for BASELINE to align by
+        // content shape; STRETCH is what AbstractTouchNavRenderer's row-direction bar uses for
+        // the same reasoning.
+        primaryBar.setAlignItems(FlexComponent.Alignment.STRETCH);
 
         if (rootNodes.size() <= n) {
             // All items fit — no chevron, no overflow section needed.
@@ -138,11 +139,13 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
             container.add(primaryBar);
 
             // Overflow section below the primary bar; expands downward as bar grows up.
-            // nav-bar class and baseline alignment match AbstractTouchNavRenderer's nav-bar setup.
+            // nav-bar class matches AbstractTouchNavRenderer's nav-bar setup; STRETCH for the
+            // same reasoning as primaryBar above (each wrapped row stretches its own items to
+            // that row's tallest — a no-op once every item is already the same height).
             var overflowFlex = new FlexLayout();
             overflowFlex.addClassName("nav-bar");
             overflowFlex.setFlexWrap(FlexLayout.FlexWrap.WRAP);
-            overflowFlex.setAlignItems(FlexComponent.Alignment.BASELINE);
+            overflowFlex.setAlignItems(FlexComponent.Alignment.STRETCH);
             overflowFlex.setWidthFull();
 
             for (var node : rootNodes.subList(n, rootNodes.size())) {
@@ -192,8 +195,20 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
 
         var content = new Div();
         content.addClassName("touch-nav-content");
+        // Button's height is fit-content around whatever this Div contains, so a section with no
+        // icon needs an icon-sized *empty* placeholder here, not to be left out entirely — see
+        // AbstractTouchNavRenderer.navItem's own comment for why: omitting it makes that item's
+        // whole button shorter than its icon-bearing siblings in the same row, shifting its label
+        // to a different vertical position (confirmed live there, and this is the same
+        // construction). touch-nav-icon-placeholder is already loaded globally via
+        // app-nav-layout.ts, not redefined here.
         if (icon != null) {
             content.add(icon);
+        }
+        else {
+            var placeholder = new Div();
+            placeholder.addClassName("touch-nav-icon-placeholder");
+            content.add(placeholder);
         }
         content.add(label);
 
@@ -204,7 +219,7 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
 
         Class<? extends Component> targetClass = node.menuEntry()
                 .<Class<? extends Component>>map(MenuEntry::menuClass)
-                .orElseGet(() -> firstChildOf(node, context));
+                .orElseGet(() -> RootNavSupport.firstChildOf(node, context));
         if (targetClass != null) {
             final var tc = targetClass;
             button.addClickListener(e -> {
@@ -221,54 +236,11 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
         return button;
     }
 
-    private List<NavNode> collectRootNodes(NavRenderContext context) {
-        var seen = new LinkedHashMap<NavNode, MenuEntry>();
-        for (var entry : MenuConfiguration.getMenuEntries()) {
-            var node = context.navGrouper().nodeFor(entry);
-            var root = rootOf(node);
-            seen.putIfAbsent(root, entry);
-        }
-        return new ArrayList<>(seen.keySet());
-    }
-
-    private NavNode rootOf(NavNode node) {
-        var current = node;
-        while (current.parent().isPresent()) {
-            current = current.parent().get();
-        }
-        return current;
-    }
-
-    private Class<? extends Component> firstChildOf(NavNode groupNode, NavRenderContext context) {
-        return MenuConfiguration.getMenuEntries().stream()
-                .filter(e -> rootOf(context.navGrouper().nodeFor(e)) == groupNode)
-                .map(MenuEntry::menuClass)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
-    }
-
     private void highlightActive(NavRenderContext context) {
-        var path = context.currentPath();
-        var activeRoot = MenuConfiguration.getMenuEntries().stream()
-                .filter(e -> pathMatches(path, e.path()))
-                .max(Comparator.comparingInt(e -> new Location(e.path()).getSegments().size()))
-                .map(e -> rootOf(context.navGrouper().nodeFor(e)))
-                .orElse(null);
-
+        var activeRoot = RootNavSupport.activeRootFor(context);
         primaryButtons.forEach((node, button) ->
                 button.getElement().getClassList().set("active", Objects.equals(node, activeRoot)));
         overflowButtons.forEach((node, button) ->
                 button.getElement().getClassList().set("active", Objects.equals(node, activeRoot)));
-    }
-
-    private boolean pathMatches(String current, String entry) {
-        var curSegs = new Location(current).getSegments();
-        var entSegs = new Location(entry).getSegments();
-        if (entSegs.isEmpty()) {
-            return curSegs.isEmpty();
-        }
-        return curSegs.size() >= entSegs.size()
-                && curSegs.subList(0, entSegs.size()).equals(entSegs);
     }
 }

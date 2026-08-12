@@ -265,11 +265,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     }
 
     private NavNode rootNodeFor(MenuEntry entry) {
-        var node = navGrouper.nodeFor(entry);
-        while (node.parent().isPresent()) {
-            node = node.parent().get();
-        }
-        return node;
+        return RootNavSupport.rootOf(navGrouper.nodeFor(entry));
     }
 
     private Button navItem(String title, Icon icon, Class<? extends Component> viewClass) {

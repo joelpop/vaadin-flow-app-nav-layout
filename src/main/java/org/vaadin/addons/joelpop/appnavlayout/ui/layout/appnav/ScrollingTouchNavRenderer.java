@@ -11,17 +11,12 @@ import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
-import com.vaadin.flow.router.Location;
-import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.shared.Registration;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
 import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -169,7 +164,7 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         navButtons.clear();
         bar.removeAll();
 
-        var rootNodes = collectRootNodes(context);
+        var rootNodes = RootNavSupport.collectRootNodes(context);
         var n = Math.max(1, windowWidth / ITEM_PX);
         var needsScroll = rootNodes.size() > n;
 
@@ -225,24 +220,6 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         }
     }
 
-    private List<NavNode> collectRootNodes(NavRenderContext context) {
-        var seen = new LinkedHashMap<NavNode, MenuEntry>();
-        for (var entry : MenuConfiguration.getMenuEntries()) {
-            var node = context.navGrouper().nodeFor(entry);
-            var root = rootOf(node);
-            seen.putIfAbsent(root, entry);
-        }
-        return new ArrayList<>(seen.keySet());
-    }
-
-    private NavNode rootOf(NavNode node) {
-        var current = node;
-        while (current.parent().isPresent()) {
-            current = current.parent().get();
-        }
-        return current;
-    }
-
     private Button createNavButton(NavNode node, NavRenderContext context) {
         var icon = node.createIcon().orElse(null);
         if (icon != null) {
@@ -254,8 +231,19 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
 
         var content = new Div();
         content.addClassName("touch-nav-content");
+        // Button's height is fit-content around whatever this Div contains, so a section with no
+        // icon needs an icon-sized *empty* placeholder here, not to be left out entirely — see
+        // AbstractTouchNavRenderer.navItem's own comment for why: omitting it makes that item's
+        // whole button shorter than its icon-bearing siblings in the same row, shifting its label
+        // to a different vertical position. touch-nav-icon-placeholder is already loaded globally
+        // via app-nav-layout.ts, not redefined here.
         if (icon != null) {
             content.add(icon);
+        }
+        else {
+            var placeholder = new Div();
+            placeholder.addClassName("touch-nav-icon-placeholder");
+            content.add(placeholder);
         }
         content.add(label);
 
@@ -266,7 +254,7 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
 
         Class<? extends Component> targetClass = node.menuEntry()
                 .<Class<? extends Component>>map(MenuEntry::menuClass)
-                .orElseGet(() -> firstChildOf(node, context));
+                .orElseGet(() -> RootNavSupport.firstChildOf(node, context));
         if (targetClass != null) {
             final var tc = targetClass;
             button.addClickListener(e -> UI.getCurrent().navigate(tc));
@@ -275,34 +263,9 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         return button;
     }
 
-    private Class<? extends Component> firstChildOf(NavNode groupNode, NavRenderContext context) {
-        return MenuConfiguration.getMenuEntries().stream()
-                .filter(e -> rootOf(context.navGrouper().nodeFor(e)) == groupNode)
-                .map(MenuEntry::menuClass)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
-    }
-
     private void highlightActive(NavRenderContext context) {
-        var path = context.currentPath();
-        var activeRoot = MenuConfiguration.getMenuEntries().stream()
-                .filter(e -> pathMatches(path, e.path()))
-                .max(Comparator.comparingInt(e -> new Location(e.path()).getSegments().size()))
-                .map(e -> rootOf(context.navGrouper().nodeFor(e)))
-                .orElse(null);
-
+        var activeRoot = RootNavSupport.activeRootFor(context);
         navButtons.forEach((node, button) ->
                 button.getElement().getClassList().set("active", Objects.equals(node, activeRoot)));
-    }
-
-    private boolean pathMatches(String current, String entry) {
-        var curSegs = new Location(current).getSegments();
-        var entSegs = new Location(entry).getSegments();
-        if (entSegs.isEmpty()) {
-            return curSegs.isEmpty();
-        }
-        return curSegs.size() >= entSegs.size()
-                && curSegs.subList(0, entSegs.size()).equals(entSegs);
     }
 }

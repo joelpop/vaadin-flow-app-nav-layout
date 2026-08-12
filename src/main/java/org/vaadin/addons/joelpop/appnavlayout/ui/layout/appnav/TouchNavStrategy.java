@@ -117,7 +117,8 @@ final class TouchNavStrategy implements NavStrategy {
         var slots = rail
                 ? new NavSlotsImpl(inertSlot, primaryNavSlot, inertSlot, headerNavSlot)
                 : new NavSlotsImpl(inertSlot, inertSlot, primaryNavSlot, headerNavSlot);
-        var context = new NavRenderContextImpl(owner.navGrouper, owner.navigationSignal.peek().getPath(), slots);
+        var context = new NavRenderContextImpl(
+                owner.navGrouper, owner.navigationSignal.peek().getPath(), slots, owner.navPathMatcher);
         owner.activeRenderer.render(context);
     }
 

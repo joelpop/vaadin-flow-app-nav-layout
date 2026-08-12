@@ -73,7 +73,8 @@ final class DesktopNavStrategy implements NavStrategy {
     @Override
     public void populate() {
         var slots = new NavSlotsImpl(drawerNavSlot, inertSlot, inertSlot, inertSlot);
-        var context = new NavRenderContextImpl(owner.navGrouper, owner.navigationSignal.peek().getPath(), slots);
+        var context = new NavRenderContextImpl(
+                owner.navGrouper, owner.navigationSignal.peek().getPath(), slots, owner.navPathMatcher);
         owner.activeRenderer.render(context);
     }
 
