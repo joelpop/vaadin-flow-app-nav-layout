@@ -36,6 +36,9 @@ import java.util.Objects;
 public class ScrollingTouchNavRenderer implements NavRenderer {
 
     private static final int ITEM_PX = 72;
+    // Drives both the chevrons' actual flex-basis and the available-width math below, from this
+    // one place, so the two can't drift apart.
+    private static final int CHEVRON_ZONE_PX = 33;
 
     private HasComponents attachedSlot;
     private NavRenderContext cachedContext;
@@ -44,6 +47,8 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
     private final Map<NavNode, Button> navButtons = new LinkedHashMap<>();
     private FlexLayout bar;
     private Div wrapper;
+    private Button leftChevron;
+    private Button rightChevron;
 
     @Override
     public NavType navType() {
@@ -113,6 +118,15 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         // muted secondary color, and a chevron never becomes .active (it's not a route item), so it
         // would be permanently stuck muted. scrolling-touch-nav.css gives the chevron classes the
         // same padding/min-width reset directly instead, without that side effect.
+        //
+        // A real flex sibling of bar (via wrapper's own display:flex, scrolling-touch-nav.css),
+        // not an absolutely-positioned overlay on top of it — an overlay leaves whichever item
+        // happens to scroll underneath with a smaller effective tap target than the others, since
+        // part of its area is covered by the (higher z-index) chevron. As a normal flex child,
+        // the chevron's own box is never shared with an item's; buildItems sizes it to
+        // CHEVRON_ZONE_PX (a real tap target, not just however wide its icon+placeholder content
+        // happens to be) exactly when scrolling is possible, and collapses it to zero otherwise so
+        // it doesn't cost items any width when there's nothing to scroll to.
         var leftIcon = VaadinIcon.ANGLE_LEFT.create();
         leftIcon.setSize("20px");
         // A non-breaking space, not truly empty — some browsers collapse a literally
@@ -125,14 +139,10 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         leftLabelPlaceholder.addClassName("touch-nav-label-placeholder");
         var leftContent = new Div(leftIcon, leftLabelPlaceholder);
         leftContent.addClassName("touch-nav-content");
-        var leftChevron = new Button(leftContent);
+        leftChevron = new Button(leftContent);
         leftChevron.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         leftChevron.addClassName("scrolling-touch-nav-chevron-left");
-        leftChevron.getElement().getStyle()
-                .set("position", "absolute")
-                .set("top", "0").set("left", "0")
-                .set("z-index", "1")
-                .set("cursor", "pointer");
+        leftChevron.getElement().getStyle().set("cursor", "pointer");
 
         var rightIcon = VaadinIcon.ANGLE_RIGHT.create();
         rightIcon.setSize("20px");
@@ -141,20 +151,13 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         rightLabelPlaceholder.addClassName("touch-nav-label-placeholder");
         var rightContent = new Div(rightIcon, rightLabelPlaceholder);
         rightContent.addClassName("touch-nav-content");
-        var rightChevron = new Button(rightContent);
+        rightChevron = new Button(rightContent);
         rightChevron.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         rightChevron.addClassName("scrolling-touch-nav-chevron-right");
-        rightChevron.getElement().getStyle()
-                .set("position", "absolute")
-                .set("top", "0").set("right", "0")
-                .set("z-index", "1")
-                .set("cursor", "pointer");
+        rightChevron.getElement().getStyle().set("cursor", "pointer");
 
         wrapper = new Div(leftChevron, bar, rightChevron);
         wrapper.addClassName("scrolling-touch-nav-wrapper");
-        wrapper.getElement().getStyle()
-                .set("position", "relative")
-                .set("width", "100%");
 
         slot.removeAll();
         slot.add(wrapper);
@@ -171,7 +174,12 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         var needsScroll = rootNodes.size() > n;
 
         if (needsScroll) {
-            var itemWidth = String.format("%.4fpx", (double) windowWidth / n);
+            // The bar's own real width, once the two chevron zones claim their share of the
+            // wrapper's flex row, is narrower than windowWidth by CHEVRON_ZONE_PX on each side —
+            // sized against that, not the full window, so n items actually fit per page instead
+            // of slightly overrunning the now-narrower bar.
+            var availableForItems = Math.max(ITEM_PX, windowWidth - 2 * CHEVRON_ZONE_PX);
+            var itemWidth = String.format("%.4fpx", (double) availableForItems / n);
             bar.getStyle()
                .set("overflow-x", "auto")
                .set("overflow-y", "hidden")
@@ -190,6 +198,8 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
                 bar.add(button);
             }
 
+            leftChevron.getStyle().set("flex", "0 0 " + CHEVRON_ZONE_PX + "px");
+            rightChevron.getStyle().set("flex", "0 0 " + CHEVRON_ZONE_PX + "px");
             wrapper.addClassName("scrolling-touch-nav-has-overflow");
         }
         else {
@@ -209,6 +219,8 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
                 bar.add(button);
             }
 
+            leftChevron.getStyle().set("flex", "0 0 0");
+            rightChevron.getStyle().set("flex", "0 0 0");
             wrapper.removeClassName("scrolling-touch-nav-has-overflow");
         }
     }
