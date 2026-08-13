@@ -169,6 +169,15 @@ GLOBAL_STYLES.replaceSync(`
         gap: var(--vaadin-gap-m);
     }
 
+    /* Vertical space between wrapped rows of items in a .nav-bar that wraps onto multiple lines
+       (currently ExpandingTouchNavRenderer's overflow grid; a no-op for every other .nav-bar,
+       none of which wrap). row-gap only affects that inter-line spacing, not the space between
+       items within a single line, so this doesn't touch horizontal spacing in any bar that
+       never wraps. */
+    .nav-bar {
+        row-gap: var(--vaadin-gap-m);
+    }
+
     /* This is a real vaadin-button (theme="tertiary" — see AbstractTouchNavRenderer.navItem's own
        comment for why), not a bare reset element, so only sizing is overridden here; the button's
        own tertiary-variant CSS already supplies a transparent background and borderless look. */

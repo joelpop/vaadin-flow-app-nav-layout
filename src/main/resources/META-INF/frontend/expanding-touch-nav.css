@@ -21,6 +21,13 @@ vaadin-app-layout::part(navbar-bottom) {
        not whatever ancestor outside this add-on's control happens to be the nearest positioned
        one otherwise. */
     position: relative;
+    /* Vertical space between this column's own direct children — the primary bar and the
+       overflow section, when both are present. Matches .nav-bar's own row-gap (app-nav-
+       layout.ts) so the gap above the primary bar's row and the gaps between the overflow
+       section's own wrapped rows read as the same rhythm, not two different spacings next to
+       each other. The chevron row doesn't participate — it's position:absolute, out of this
+       column's flow entirely. */
+    gap: var(--vaadin-gap-m);
 }
 
 .expanding-touch-nav-chevron-row {
