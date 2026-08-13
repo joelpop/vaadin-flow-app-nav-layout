@@ -24,7 +24,8 @@ import java.util.Objects;
  * An alternative {@link NavRenderer} for {@link NavType#TOUCH} — a horizontally scrollable bar
  * of root sections in {@link NavSlots#touchBar()}, with fading edge chevrons instead of the
  * default "More" popover. Every root section gets its own item; when there are more than fit,
- * the bar scrolls instead of overflowing into a secondary surface.
+ * the bar scrolls instead of overflowing into a secondary surface. Also drives the shared
+ * {@link SecondaryTabBar} drill-down bar, the same as every other built-in touch/rail renderer.
  */
 @CssImport("./scrolling-touch-nav.css")
 @JsModule("./scrolling-touch-nav-scroll-indicator.js")
@@ -45,6 +46,8 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
     private Button leftChevron;
     private Button rightChevron;
 
+    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar();
+
     @Override
     public NavType navType() {
         return NavType.TOUCH;
@@ -62,6 +65,7 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
             buildItems(context);
         }
         highlightActive(context);
+        secondaryTabBar.render(context);
     }
 
     private void buildBar(HasComponents slot) {

@@ -25,7 +25,8 @@ import java.util.Objects;
  * An alternative {@link NavRenderer} for {@link NavType#TOUCH} — a grid of root sections in
  * {@link NavSlots#touchBar()} that expands upward via a chevron when there are more than fit,
  * instead of the default "More" popover. The primary row always shows a fixed, even number of
- * items; the rest sit in a collapsible overflow section beneath it.
+ * items; the rest sit in a collapsible overflow section beneath it. Also drives the shared
+ * {@link SecondaryTabBar} drill-down bar, the same as every other built-in touch/rail renderer.
  */
 @CssImport("./expanding-touch-nav.css")
 public class ExpandingTouchNavRenderer implements NavRenderer {
@@ -44,6 +45,8 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
     private final Map<NavNode, Button> primaryButtons = new LinkedHashMap<>();
     private final Map<NavNode, Button> overflowButtons = new LinkedHashMap<>();
 
+    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar();
+
     @Override
     public NavType navType() {
         return NavType.TOUCH;
@@ -58,6 +61,7 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
             buildContainer(slot);
         }
         buildItems(context);
+        secondaryTabBar.render(context);
     }
 
     private void buildContainer(HasComponents slot) {
