@@ -355,19 +355,29 @@ Which chrome gets built for a scenario isn't a separate choice from the renderer
 setTabletLandscapeNavRenderer(SideNavDrawerNavRenderer::new); // sidenav drawer in landscape tablet orientation, replacing the rail default
 ```
 
-Or subclass one of the built-ins to change just one piece of its behavior — for example, replacing the phone touch bar's default "More" popover with an expanding chevron:
+Or subclass one of the built-ins to change a piece of its behavior — for example, replacing what appears in response to the phone touch bar's "More" trigger (default: a `Popover` listing the overflowing entries) with a `Dialog` instead. The "More" trigger itself is still built for you; this only replaces the companion component shown in response to the user tapping it:
 
 ```java
 setPhoneNavRenderer(() -> new TouchBarNavRenderer() {
     @Override
     protected Component createOverflowComponent(List<MenuEntry> overflowEntries,
             Button overflowTrigger, Map<NavNode, Button> overflowButtonsOut) {
-        return myChevronExpandComponent(overflowEntries, overflowTrigger, overflowButtonsOut);
+        return myOverflowDialog(overflowEntries, overflowTrigger, overflowButtonsOut);
     }
 });
 ```
 
-See [API Reference](#api-reference) for `NavRenderer`, `NavRenderContext`, and `NavSlots`.
+#### Built-in alternatives for the phone touch bar
+
+`ScrollingTouchNavRenderer` and `ExpandingTouchNavRenderer` are ready-made alternatives to the default `TouchBarNavRenderer` — fully separate renderers, not subclasses of it, each handling overflow its own way instead of a "More" trigger and popover: `ScrollingTouchNavRenderer` gives every root section its own item and makes the bar horizontally scrollable, with fading edge chevrons, instead of collapsing the excess into a popover at all; `ExpandingTouchNavRenderer` keeps a fixed, even-numbered primary row and reveals the rest via a separate floating chevron that expands a section beneath it. Register either the same way as any other renderer:
+
+```java
+setPhoneNavRenderer(ScrollingTouchNavRenderer::new);
+```
+
+Both public, no-arg constructors, same as the defaults.
+
+See [Alternatives](#alternatives) for screenshots of both in action, and [API Reference](#api-reference) for `NavRenderer`, `NavRenderContext`, and `NavSlots`.
 
 ### Supplying branding
 
@@ -448,6 +458,8 @@ Called again on every navigation. If the returned component is already attached 
 
 ### Defaults
 
+Without any configuration, this is what the app chrome looks like on desktop, tablet, and phone in both portrait and landscape orientations.
+
 <table>
 <tr>
 <td align="center" colspan="2">
@@ -479,6 +491,8 @@ Called again on every navigation. If the returned component is already attached 
 
 ### Customized
 
+After a small amount of configuration to provide things like group icons and to tweak some of the default labels, this is what the app chrome looks like.
+
 <table>
 <tr>
 <td align="center" colspan="2">
@@ -504,6 +518,33 @@ Called again on every navigation. If the returned component is already attached 
 <td align="center">
 <img src="README/custom/phone-landscape.png" width="300"><br>
 <sub><b>Phone, landscape</b> — <code>TOUCH</code> bottom bar, wide enough that nothing overflows</sub>
+</td>
+</tr>
+</table>
+
+### Alternatives
+
+But you aren't stuck with the default renderers. There are some alternative renderers that can be used in place of the default ones, or you can roll your own — see [Built-in alternatives for the phone touch bar](#built-in-alternatives-for-the-phone-touch-bar) for how to register the two shown below.
+
+<table>
+<tr>
+<td align="center">
+<img src="README/custom/phone-portrait-unscrolled.png" width="140"><br>
+<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a side-to-side scroller (unscrolled)</sub>
+</td>
+<td align="center">
+<img src="README/custom/phone-portrait-scrolled.png" width="140"><br>
+<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a side-to-side scroller (scrolled)</sub>
+</td>
+</tr>
+<tr>
+<td align="center">
+<img src="README/custom/phone-portrait-collapsed.png" width="140"><br>
+<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into an expander (collapsed)</sub>
+</td>
+<td align="center">
+<img src="README/custom/phone-portrait-expanded.png" width="140"><br>
+<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into an expander (expanded)</sub>
 </td>
 </tr>
 </table>
@@ -539,7 +580,8 @@ See [Nav renderers](#nav-renderers) for configuring each of these pieces, and [A
 - **Custom grouping strategy** — replace `PathPrefixNavGrouper` entirely with your own `NavGrouper`.
 - **Custom active-item matching** — override path matching for touch/rail highlighting (`setNavPathMatcher`), or nested-route match behavior for desktop `SideNav` highlighting (`setNavMatchNested`).
 - **Per-scenario renderers** — independently swap the `NavRenderer` for any of the five device/orientation scenarios, or set both orientations of tablet/phone at once.
-- **Partial overrides** — subclass a built-in renderer to change just one behavior, e.g. `createOverflowComponent()` to replace the "More" popover with a chevron or swipeable strip.
+- **Partial overrides** — subclass a built-in renderer to change just one behavior, e.g. override `createOverflowComponent()` to replace the "More" popover with your own presentation.
+- **Built-in phone touch bar alternatives** — `ScrollingTouchNavRenderer`/`ExpandingTouchNavRenderer` ship two ready-made, fully separate renderers for the phone scenario, each with its own overflow presentation (a scrolling strip, an expanding grid) — no subclassing required.
 - **Custom `SideNavItem` rendering** — override `setNavNodeRenderer` for full control of the desktop drawer's item appearance.
 - **Configurable breakpoint** — adjust the physical-screen-size threshold that distinguishes tablet from phone (`setTabletMinShortSidePx`).
 - **Lifecycle hook** — react to nav-type changes via `onNavTypeChanged`/`NavTypeChangedEvent`.
@@ -637,11 +679,12 @@ never influences or queries how the tree is grouped.
 
 Passed to `NavRenderer.render(...)`.
 
-| Method          | Description                                                        |
-|-----------------|--------------------------------------------------------------------|
-| `navGrouper()`  | The current nav grouping strategy.                                 |
-| `currentPath()` | The path of the currently active navigation, leading `/` stripped. |
-| `slots()`       | The full set of named locations available to render into.          |
+| Method             | Description                                                                                                                                                                                                        |
+|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `navGrouper()`     | The current nav grouping strategy.                                                                                                                                                                                |
+| `currentPath()`    | The path of the currently active navigation, leading `/` stripped.                                                                                                                                               |
+| `slots()`          | The full set of named locations available to render into.                                                                                                                                                        |
+| `navPathMatcher()` | The configured `setNavPathMatcher` predicate. A renderer that compares paths itself for active-item matching should test against this rather than hardcoding its own comparison, or `setNavPathMatcher` silently won't affect it. |
 
 ### `NavSlots`
 
@@ -664,13 +707,29 @@ Default `NavRenderer` for the desktop scenario — builds a full `SideNav` hiera
 
 Default `NavRenderer`s for the tablet (both orientations) and phone scenarios respectively: a
 primary icon bar (rail or bottom bar) with a "More" overflow `Popover` when more root sections
-exist than fit, plus a shared two-level drill-down bar in `NavSlots.headerNav()`. Both public,
-no-arg constructors, sharing their implementation internally.
+exist than fit, plus a shared two-level drill-down bar in `NavSlots.headerNav()` — the same
+drill-down bar every built-in touch/rail renderer uses, including `ScrollingTouchNavRenderer`/
+`ExpandingTouchNavRenderer` below. Both public, no-arg constructors, sharing their implementation
+internally.
 
 | Method                                                                                                                      | Description                                                                                                                                                                                                                                                                                                                                                                       |
 |-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `createOverflowComponent(List<MenuEntry> overflowEntries, Button overflowTrigger, Map<NavNode, Button> overflowButtonsOut)` | Protected. Default: a `Popover` listing the overflowing entries. Override in a subclass to replace the overflow presentation (e.g. an expand chevron or a swipeable strip) while keeping bar layout, active highlighting, and header-nav delegation unchanged. Populate `overflowButtonsOut` the same way if the "More" item should highlight while one of its entries is active. |
+| `createOverflowComponent(List<MenuEntry> overflowEntries, Button overflowTrigger, Map<NavNode, Button> overflowButtonsOut)` | Protected. Default: a `Popover` listing the overflowing entries. Override in a subclass to replace it with a different presentation shown in response to tapping the "More" trigger (e.g. a `Dialog`) while keeping bar layout, active highlighting, and header-nav delegation unchanged. Populate `overflowButtonsOut` the same way if the "More" item should highlight while one of its entries is active. |
 | `createNavButton(Component content, Class<? extends Component> viewClass)`                                                 | Protected. Builds the themed nav-bar `Button` wrapping `content`, navigating to `viewClass` on click (or doing nothing if `null`). Reuse this from a `createOverflowComponent` override that still wants per-entry buttons, rather than constructing a `Button` directly, to keep the active item's theme-adaptive accent color.                                                 |
+
+### `ScrollingTouchNavRenderer`
+
+Alternative `NavRenderer` for the phone scenario: every root section gets its own item in a
+horizontally scrollable bar, with fading edge chevrons instead of the default "More" popover —
+when there are more sections than fit, the bar scrolls instead of overflowing into a secondary
+surface. Same shared drill-down bar as the other touch/rail renderers. Public, no-arg constructor.
+
+### `ExpandingTouchNavRenderer`
+
+Alternative `NavRenderer` for the phone scenario: root sections in a grid that expands upward via
+a chevron when there are more than fit, instead of the default "More" popover. The primary row
+always shows a fixed, even number of items; the rest sit in a collapsible section beneath it.
+Same shared drill-down bar as the other touch/rail renderers. Public, no-arg constructor.
 
 ### `NavGrouper` (`@FunctionalInterface`)
 

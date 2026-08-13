@@ -301,13 +301,14 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
 
     /**
      * Creates the overflow-triggering component shown alongside the "More" bar item —
-     * default: a {@link Popover} listing the overflowing entries. Override to replace the
-     * overflow presentation (e.g. an expand chevron or a swipeable strip) while keeping bar
-     * layout, active highlighting, and header-nav delegation unchanged. Implementations that
-     * want the "More" item to highlight while one of their entries is active should populate
-     * {@code overflowButtonsOut} the same way this default does. If the replacement presentation
-     * still uses one button per entry, build them via {@link #createNavButton} rather than a
-     * plain {@code new Button(...)} to keep the same theme-adaptive active-color behavior.
+     * default: a {@link Popover} listing the overflowing entries. Override to replace it with a
+     * different presentation shown in response to tapping the "More" trigger (e.g. a
+     * {@code Dialog}) while keeping bar layout, active highlighting, and header-nav delegation
+     * unchanged. Implementations that want the "More" item to highlight while one of their
+     * entries is active should populate {@code overflowButtonsOut} the same way this default
+     * does. If the replacement presentation still uses one button per entry, build them via
+     * {@link #createNavButton} rather than a plain {@code new Button(...)} to keep the same
+     * theme-adaptive active-color behavior.
      */
     protected Component createOverflowComponent(List<MenuEntry> overflowEntries, Button overflowTrigger,
                                                  Map<NavNode, Button> overflowButtonsOut) {

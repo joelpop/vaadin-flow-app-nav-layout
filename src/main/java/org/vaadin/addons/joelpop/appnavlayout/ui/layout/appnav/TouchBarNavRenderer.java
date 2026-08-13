@@ -8,8 +8,8 @@ import com.vaadin.flow.component.orderedlayout.FlexLayout;
  * — a bottom icon bar in {@link NavSlots#touchBar()}, with a "More" overflow trigger when more
  * root sections exist than fit, plus a two-level drill-down bar in {@link NavSlots#headerNav()}.
  *
- * <p>Override {@link #createOverflowComponent} to replace the overflow presentation (e.g. an
- * expand chevron or a swipeable strip) while keeping everything else unchanged.
+ * <p>Override {@link #createOverflowComponent} to replace what's shown in response to tapping
+ * the "More" trigger (e.g. a {@code Dialog}) while keeping everything else unchanged.
  */
 public class TouchBarNavRenderer extends AbstractTouchNavRenderer {
 
