@@ -279,12 +279,11 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         // around whatever this Div contains (see vaadin-button-base-styles.js: ":host { height:
         // var(--vaadin-button-height, fit-content) }"), so a section with no icon always gets an
         // icon-sized *empty* placeholder here instead of leaving the icon out entirely — omitting
-        // it (the previous behavior, matching SideNavItem's own icon.ifPresent(...)) made that
+        // it (the previous behavior, matching SideNavItem's own icon.ifPresent(...)) makes that
         // item's whole button shorter than its icon-bearing siblings, shifting its label to a
-        // different vertical position — confirmed live: an icon-less item's label sat 24px higher
-        // than its siblings'. A visible placeholder glyph would misrepresent the item as having an
-        // icon; an empty same-footprint box keeps every item's height (and thus its label's
-        // position) identical without implying one.
+        // different vertical position. A visible placeholder glyph would misrepresent the item as
+        // having an icon; an empty same-footprint box keeps every item's height (and thus its
+        // label's position) identical without implying one.
         var content = new Div(titleSpan);
         content.addClassName("touch-nav-content");
         if (icon != null) {

@@ -1,17 +1,100 @@
 /*
- * Expanding touch nav — column flex, slot grows upward to include the chevron row.
+ * Expanding touch nav — column flex: primary nav-bar → overflow section. The chevron row is a
+ * position:absolute overlay contributing nothing to this container's own height; its Java-
+ * computed `top` (see ExpandingTouchNavRenderer.buildChevronRow) lands the visible chevron
+ * icon's own center exactly on AppLayout's real navbar-bottom/content boundary, not on this
+ * container's own top edge (the two aren't the same point — see that method's comment for why).
  *
- * Column layout (top to bottom): chevron row → primary nav-bar → overflow section.
- * The slot extends upward to accommodate all three; the primary items sit above the
- * overflow rows, which grow below them when expanded.
+ * navbar-bottom's own align-items is forced from its default center to flex-start: with center,
+ * the primary bar's own top edge drifts relative to the boundary above as this container's total
+ * height changes between collapsed/expanded, even though every padding value involved is a
+ * constant, theme-driven one that doesn't itself change with expand state. flex-start keeps that
+ * edge fixed regardless of how tall this container's content gets.
  */
+vaadin-app-layout::part(navbar-bottom) {
+    align-items: flex-start;
+}
+
 .expanding-touch-nav {
     width: 100%;
+    /* Anchors expanding-touch-nav-chevron-row's absolute positioning to this element's own box,
+       not whatever ancestor outside this add-on's control happens to be the nearest positioned
+       one otherwise. */
+    position: relative;
 }
 
 .expanding-touch-nav-chevron-row {
     display: flex;
     justify-content: center;
+    position: absolute;
+    top: 0;   /* overridden in Java once the real boundary position is measured */
+    left: 50%;
+    transform: translateX(-50%);
+    /* AppLayout gives navbar-bottom position:fixed;z-index:1, while its [content] sibling has
+       neither, so stacking already favors navbar-bottom by default; this is a defensive
+       insurance layer in case some other ancestor's z-index intrudes. */
+    z-index: 1;
+    /* This row's own box is a plain rectangle matching expanding-touch-nav-chevron-circle's full
+       square footprint before the button's own clip-path rounds off the actual tap target —
+       without this, it would still catch taps in the corners that clip-path excludes, just
+       silently, as a dead zone, rather than letting them fall through to whatever's behind it.
+       pointer-events:none makes taps pass straight through this row as if it weren't there.
+       pointer-events is itself inherited, so the circle (and the button inside it) would
+       otherwise inherit that none from this row too — the sibling rule below explicitly opts
+       the row's own direct child back in, which the button then inherits in turn from it. */
+    pointer-events: none;
+}
+
+.expanding-touch-nav-chevron-row > * {
+    pointer-events: auto;
+}
+
+.expanding-touch-nav-chevron-circle {
+    /* A plain, entirely un-themed div carries the button's visual styling instead of the button
+       itself — no theme variants and no internal shadow-DOM rules apply to it, so its own
+       width/height/background/border/border-radius are simply, reliably what they say,
+       regardless of which theme (Lumo, Aura, or the base theme) is active. */
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    /* Rounds this wrapper's own paint (background, border) and gives the button inside a visual
+       backstop if it ever renders larger than this box — clip-path on the button itself (below)
+       is the actual hit-testing boundary for the tap target, since border-radius + overflow only
+       reliably governs paint, not pointer events, for a child sized to exactly match its
+       parent. */
+    overflow: hidden;
+    /* --vaadin-background-color is Vaadin's opaque page-canvas token, matching navbar-bottom's
+       own real background. --vaadin-background-container is a translucent tint by design (a
+       subtle surface-layering token), not a solid fill, despite the name. */
+    background: var(--vaadin-background-color);
+    /* Matches AppLayout's own navbar-bottom border-top, rather than a color that merely looks
+       similar, so this stays correct if the active theme's border-color-secondary token ever
+       changes. */
+    border: 1px solid var(--vaadin-border-color-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+vaadin-button.expanding-touch-nav-chevron {
+    /* Fills the circle above completely, so the button's own click/keyboard hit area matches
+       the full 44px circle. The tag+class selector (rather than the bare class) gives this a
+       higher specificity than Lumo's own :host, which sets an explicit height — a plain class
+       selector alone ties with :host's own specificity, decided only by which stylesheet loads
+       last; qualifying with the tag name here settles it outright instead.
+       expanding-touch-nav-chevron-circle above carries the visible shape (background, border);
+       clip-path here is what actually excludes this button's own square corners from
+       hit-testing — CSS Masking specifies that clip-path excludes the clipped region from
+       pointer events, not just paint, unlike border-radius + overflow on the wrapper, which is
+       why that alone isn't relied on for this. This element's width and height are both already
+       pinned to the same 44px value via the rule above, so there's nothing for a circle() radius
+       calculation to get wrong deriving one from the other. padding:0 keeps the icon centered
+       within this button's own box — Lumo's tertiary/icon padding is horizontal-only, sized for
+       a text button. */
+    width: 100%;
+    height: 100%;
+    clip-path: circle(50%);
+    padding: 0;
 }
 
 .expanding-touch-nav-overflow {

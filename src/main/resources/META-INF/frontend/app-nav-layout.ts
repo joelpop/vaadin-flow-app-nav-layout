@@ -91,13 +91,12 @@ GLOBAL_STYLES.replaceSync(`
        navbar-bottom parts, e.g. a separate scroll-behavior add-on styling the same AppLayout,
        shifts which stylesheet's rules win adjacent cascade ties), that bogus value can start
        actually landing as the host's real padding-bottom instead of being incidentally masked —
-       collapsing the entire content area to a sliver, confirmed live: hostPaddingBottom computed
-       to the full viewport height (e.g. 1180px on an 1180px-tall viewport) with such a stylesheet
-       present, squeezing routed content down to a ~32px strip. The rail already reserves its
-       space via padding-inline-start, not padding-bottom, so there's nothing for this to
-       legitimately contribute here regardless of what else is loaded on the page. !important
-       because relying on which stylesheet happens to be adopted last is exactly the failure mode
-       this fixes. */
+       collapsing the entire content area to a sliver (hostPaddingBottom computing to the full
+       viewport height, e.g. 1180px on an 1180px-tall viewport, with such a stylesheet present,
+       squeezes routed content down to a ~32px strip). The rail already reserves its space via
+       padding-inline-start, not padding-bottom, so there's nothing for this to legitimately
+       contribute here regardless of what else is loaded on the page. !important because relying
+       on which stylesheet happens to be adopted last is exactly the failure mode this fixes. */
     vaadin-app-layout[nav-rail] {
         --vaadin-app-layout-drawer-overlay: true;
         --vaadin-app-layout-navbar-offset-bottom: 0px !important;
