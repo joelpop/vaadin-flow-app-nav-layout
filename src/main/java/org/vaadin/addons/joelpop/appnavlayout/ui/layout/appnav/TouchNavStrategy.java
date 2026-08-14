@@ -67,7 +67,7 @@ final class TouchNavStrategy implements NavStrategy {
             primaryNavSlot.setSizeFull();
             owner.getElement().setAttribute("nav-rail", "");
             owner.getStyle().set("--vaadin-app-layout-drawer-overlay", "true");
-            owner.getStyle().set("--nav-rail-width", "5rem");
+            owner.getStyle().set("--nav-rail-width", owner.activeRenderer.railWidth());
             owner.getStyle().set("padding-inline-start", "var(--nav-rail-width)");
             owner.setDrawerOpened(false);
         }

@@ -58,7 +58,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     private FlexLayout bar;
     private int maxIcons = 5;
     private NavNode overflowNode;
-    private final Map<NavNode, Button> navItems = new LinkedHashMap<>();
+    private final Map<NavNode, NavItem> navItems = new LinkedHashMap<>();
     private final Map<NavNode, Button> overflowButtons = new LinkedHashMap<>();
 
     // Slot component this renderer last attached its bar into — used to detect a NavStrategy
@@ -128,8 +128,8 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
                 bar.setWidthFull();
                 bar.setJustifyContentMode(FlexComponent.JustifyContentMode.EVENLY);
                 // STRETCH, not BASELINE — every item is the same height regardless of whether its
-                // NavNode has an icon (navItem's placeholder keeps that true), so there's nothing
-                // left for BASELINE to align by content shape; STRETCH is what the column/rail
+                // NavNode has an icon (NavItem's own placeholder keeps that true), so there's
+                // nothing left for BASELINE to align by content shape; STRETCH is what the column/rail
                 // branch above already uses, for the same "don't rely on flex's own per-item
                 // baseline computation" reasoning.
                 bar.setAlignItems(FlexComponent.Alignment.STRETCH);
@@ -185,7 +185,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         for (var e : all.subList(0, Math.min(primaryCount, all.size()))) {
             var rootNode = e.getKey();
             var rep = e.getValue();
-            var item = navItem(rootNode.title(), rootNode.createIcon().orElse(null), rep.menuClass());
+            var item = new NavItem(rootNode.title(), rootNode.createIcon().orElse(null), rep.menuClass());
             navItems.put(rootNode, item);
             bar.add(item);
         }
@@ -195,10 +195,10 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
                     .map(Map.Entry::getValue)
                     .toList();
             overflowNode = NavNode.of("More", (Supplier<Icon>) null);
-            var overflowTrigger = navItem("More", VaadinIcon.ELLIPSIS_DOTS_H.create(), null);
+            var overflowTrigger = new NavItem("More", VaadinIcon.ELLIPSIS_DOTS_H.create(), null);
             navItems.put(overflowNode, overflowTrigger);
             bar.add(overflowTrigger);
-            bar.add(createOverflowComponent(overflow, overflowTrigger, overflowButtons));
+            bar.add(createOverflowComponent(overflow, overflowTrigger.asButton(), overflowButtons));
         }
     }
 
@@ -214,7 +214,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         navItems.forEach((root, item) -> {
             var active = root.equals(currentRootNode)
                     || (root == overflowNode && overflowActive);
-            item.getElement().getClassList().set("active", active);
+            item.setActive(active);
         });
 
         overflowButtons.forEach((root, btn) ->
@@ -223,52 +223,6 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
 
     private NavNode rootNodeFor(MenuEntry entry) {
         return RootNavSupport.rootOf(navGrouper.nodeFor(entry));
-    }
-
-    private Button navItem(String title, Icon icon, Class<? extends Component> viewClass) {
-        var titleSpan = new Span(title);
-        titleSpan.addClassName("touch-nav-label");
-
-        // Button lacks HasComponents and setText(String) only appends a raw text node (no
-        // element to attach the label's own styling to), so icon+label are composed in a plain
-        // Div passed as the button's "icon" content instead — see app-nav-layout.ts's
-        // "touch-nav-content" rule for the resulting layout. Button's own height is fit-content
-        // around whatever this Div contains (see vaadin-button-base-styles.js: ":host { height:
-        // var(--vaadin-button-height, fit-content) }"), so a section with no icon always gets an
-        // icon-sized *empty* placeholder here instead of leaving the icon out entirely — omitting
-        // it (the previous behavior, matching SideNavItem's own icon.ifPresent(...)) makes that
-        // item's whole button shorter than its icon-bearing siblings, shifting its label to a
-        // different vertical position. A visible placeholder glyph would misrepresent the item as
-        // having an icon; an empty same-footprint box keeps every item's height (and thus its
-        // label's position) identical without implying one.
-        var content = new Div(titleSpan);
-        content.addClassName("touch-nav-content");
-        if (icon != null) {
-            icon.setSize("20px");
-            content.addComponentAsFirst(icon);
-        }
-        else {
-            var placeholder = new Div();
-            placeholder.addClassName("touch-nav-icon-placeholder");
-            content.addComponentAsFirst(placeholder);
-        }
-
-        var item = createNavButton(content, viewClass);
-        // Structural layout (sizing/padding) and the row-direction flex:1 1 0 live in this
-        // add-on's own CSS (app-nav-layout.ts, keyed off "touch-nav-item"), not as Java-side
-        // theme utility classes — see that file's header comment for why. min-width:0 there
-        // overrides the flex-item default (min-width:auto, which pins the shrink floor to the
-        // label's un-wrapped width) so an item can actually shrink below its own natural content
-        // width and .touch-nav-label's ellipsis can engage instead of forcing the bar (row) or
-        // the rail (column, via its own cross-axis stretch) wider than intended. Needed in both
-        // directions: MIN_SLOT_PX only ever decided *whether* to show "More"/how many rail icons
-        // fit, never enforced a real per-item width ceiling on rendering — a long label (e.g.
-        // "Analytics") could otherwise push a row past its right edge, or push the rail wider
-        // than its own explicit CSS width (which then throws off vaadin-app-layout's own
-        // measurement-based sizing of the header, since it accounts for the rail's *rendered*,
-        // not intended, width).
-        item.addClassName("touch-nav-item");
-        return item;
     }
 
     /**
@@ -285,7 +239,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
      * matching {@code vaadin-side-nav-item}'s own selected-item color — the inactive state is
      * forced back to the neutral secondary color in CSS (app-nav-layout.ts).
      *
-     * <p>Exposed (not just used internally by {@link #navItem}) so a {@link #createOverflowComponent}
+     * <p>Exposed (not just used internally by {@link NavItem}) so a {@link #createOverflowComponent}
      * override that still wants per-entry buttons doesn't have to reimplement this theming/wiring
      * by hand — reuse this rather than constructing a {@code Button} directly, or the item risks
      * silently losing the theme-adaptive color this method exists to guarantee.
@@ -322,10 +276,10 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         for (var entry : overflowEntries) {
             var rootNode = rootNodeFor(entry);
 
-            // See navItem()'s own comment: Button lacks HasComponents and setText(String) only
+            // See NavItem's own comment: Button lacks HasComponents and setText(String) only
             // appends a raw text node, so icon+label are composed in a plain Div passed as the
             // button's "icon" content instead. icon is left out entirely when a section has none
-            // (same rationale as navItem()) rather than falling back to a placeholder glyph.
+            // (same rationale as NavItem) rather than falling back to a placeholder glyph.
             var content = new Div(new Span(rootNode.title()));
             content.addClassName("overflow-nav-content");
             rootNode.createIcon().ifPresent(icon -> {

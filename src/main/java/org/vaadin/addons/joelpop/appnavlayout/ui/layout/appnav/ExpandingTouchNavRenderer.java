@@ -2,12 +2,10 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasComponents;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -42,8 +40,8 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
     private FlexLayout container;
     private Icon chevronIcon;
 
-    private final Map<NavNode, Button> primaryButtons = new LinkedHashMap<>();
-    private final Map<NavNode, Button> overflowButtons = new LinkedHashMap<>();
+    private final Map<NavNode, NavItem> primaryItems = new LinkedHashMap<>();
+    private final Map<NavNode, NavItem> overflowItems = new LinkedHashMap<>();
 
     private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar();
 
@@ -98,8 +96,8 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
     }
 
     private void buildItems(NavRenderContext context) {
-        primaryButtons.clear();
-        overflowButtons.clear();
+        primaryItems.clear();
+        overflowItems.clear();
         chevronIcon = null;
         container.removeAll();
         setExpanded(false);
@@ -111,19 +109,18 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
         var primaryBar = new FlexLayout();
         primaryBar.addClassName("nav-bar");
         // Explicit, not relying on the flex default (which computes to the same thing) — every
-        // item is the same height regardless of whether its NavNode has an icon (see
-        // createNavButton's own comment), so there's nothing left for BASELINE to align by
-        // content shape; STRETCH is what AbstractTouchNavRenderer's row-direction bar uses for
-        // the same reasoning.
+        // item is the same height regardless of whether its NavNode has an icon (see NavItem's
+        // own comment), so there's nothing left for BASELINE to align by content shape; STRETCH
+        // is what AbstractTouchNavRenderer's row-direction bar uses for the same reasoning.
         primaryBar.setAlignItems(FlexComponent.Alignment.STRETCH);
 
         if (rootNodes.size() <= n) {
             // All items fit — no chevron, no overflow section needed.
             for (var node : rootNodes) {
-                var button = createNavButton(node, context, false);
-                button.getStyle().set("flex", "1");
-                primaryButtons.put(node, button);
-                primaryBar.add(button);
+                var item = createNavItem(node, context, false);
+                item.getStyle().set("flex", "1");
+                primaryItems.put(node, item);
+                primaryBar.add(item);
             }
             container.add(primaryBar);
         }
@@ -135,10 +132,10 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
 
             // Primary bar — all n slots filled by nav items.
             for (var node : rootNodes.subList(0, n)) {
-                var button = createNavButton(node, context, false);
-                button.getStyle().set("flex", itemFlex);
-                primaryButtons.put(node, button);
-                primaryBar.add(button);
+                var item = createNavItem(node, context, false);
+                item.getStyle().set("flex", itemFlex);
+                primaryItems.put(node, item);
+                primaryBar.add(item);
             }
             container.add(primaryBar);
 
@@ -156,10 +153,10 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
             overflowFlex.setWidthFull();
 
             for (var node : rootNodes.subList(n, rootNodes.size())) {
-                var button = createNavButton(node, context, true);
-                button.getStyle().set("flex", itemFlex);
-                overflowButtons.put(node, button);
-                overflowFlex.add(button);
+                var item = createNavItem(node, context, true);
+                item.getStyle().set("flex", itemFlex);
+                overflowItems.put(node, item);
+                overflowFlex.add(item);
             }
 
             var overflowSection = new Div(overflowFlex);
@@ -269,62 +266,27 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
         }
     }
 
-    private Button createNavButton(NavNode node, NavRenderContext context, boolean inOverflow) {
+    private NavItem createNavItem(NavNode node, NavRenderContext context, boolean inOverflow) {
         var icon = node.createIcon().orElse(null);
         if (icon != null) {
             icon.setSize("20px");
         }
-
-        var label = new Span(node.title());
-        label.addClassName("touch-nav-label");
-
-        var content = new Div();
-        content.addClassName("touch-nav-content");
-        // Button's height is fit-content around whatever this Div contains, so a section with no
-        // icon needs an icon-sized *empty* placeholder here, not to be left out entirely — see
-        // AbstractTouchNavRenderer.navItem's own comment for why: omitting it makes that item's
-        // whole button shorter than its icon-bearing siblings in the same row, shifting its label
-        // to a different vertical position. touch-nav-icon-placeholder is already loaded globally
-        // via app-nav-layout.ts, not redefined here.
-        if (icon != null) {
-            content.add(icon);
-        }
-        else {
-            var placeholder = new Div();
-            placeholder.addClassName("touch-nav-icon-placeholder");
-            content.add(placeholder);
-        }
-        content.add(label);
-
-        var button = new Button();
-        button.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        button.addClassName("touch-nav-item");
-        button.getElement().appendChild(content.getElement());
-
         Class<? extends Component> targetClass = node.menuEntry()
                 .<Class<? extends Component>>map(MenuEntry::menuClass)
                 .orElseGet(() -> RootNavSupport.firstChildOf(node, context));
-        if (targetClass != null) {
-            final var tc = targetClass;
-            button.addClickListener(e -> {
-                if (inOverflow) {
-                    setExpanded(false);
-                }
-                UI.getCurrent().navigate(tc);
-            });
+        var item = new NavItem(node.title(), icon, targetClass);
+        if (inOverflow) {
+            // Collapses the overflow section on click regardless of whether this item also
+            // navigates — added alongside NavItem's own navigate listener (if targetClass is
+            // non-null) rather than replacing it; Button supports multiple click listeners.
+            item.asButton().addClickListener(e -> setExpanded(false));
         }
-        else if (inOverflow) {
-            button.addClickListener(e -> setExpanded(false));
-        }
-
-        return button;
+        return item;
     }
 
     private void highlightActive(NavRenderContext context) {
         var activeRoot = RootNavSupport.activeRootFor(context);
-        primaryButtons.forEach((node, button) ->
-                button.getElement().getClassList().set("active", Objects.equals(node, activeRoot)));
-        overflowButtons.forEach((node, button) ->
-                button.getElement().getClassList().set("active", Objects.equals(node, activeRoot)));
+        primaryItems.forEach((node, item) -> item.setActive(Objects.equals(node, activeRoot)));
+        overflowItems.forEach((node, item) -> item.setActive(Objects.equals(node, activeRoot)));
     }
 }

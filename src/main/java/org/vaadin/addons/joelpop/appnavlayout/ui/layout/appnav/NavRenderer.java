@@ -39,4 +39,14 @@ public interface NavRenderer {
      * render into a slot that's never attached to the page, with nothing to indicate why.
      */
     NavType navType();
+
+    /**
+     * The rail's own width, as a CSS length — consulted only when {@link #navType()} is
+     * {@link NavType#RAIL}. Default matches the built-in rail renderers' own icon-and-label-only
+     * content. Override when a renderer's items need more (or less) horizontal room than that —
+     * e.g. {@link FlyoutRailNavRenderer}'s own trailing chevron box.
+     */
+    default String railWidth() {
+        return "5rem";
+    }
 }

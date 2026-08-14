@@ -1,0 +1,103 @@
+/*
+ * Flyout rail — FlyoutRailNavRenderer's own root rail column, and the chevron-triggered popup
+ * panel NavItem builds for a branch's children. Both carry .flyout-rail-column, so scrolling and
+ * item styling stay identical at every depth; .flyout-rail-popover-column, added only to a
+ * flyout's own content (not the root), caps its height since nothing external constrains it the
+ * way the root column's own setSizeFull() does.
+ */
+
+.flyout-rail-column {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+/* No gap: once each item's own height correctly fits its content (see app-nav-layout.ts's own
+   vaadin-button.touch-nav-item rule, instead of being clipped down to Lumo's fixed default),
+   items already read as comfortably separated on their own — matching the root rail's own column,
+   which has the equivalent rule (scoped there, since it's not detached from vaadin-app-layout the
+   way a flyout's own content is). Two classes (not just .flyout-rail-column alone), so this wins
+   the specificity tie against app-nav-layout.ts's own unscoped ".nav-bar { row-gap: ... }" rule
+   regardless of which stylesheet happens to load/adopt last. */
+.flyout-rail-column.nav-bar {
+    row-gap: 0;
+}
+
+/* width:100% forces the button itself to the column's own width (its widest child's natural
+   size, absent any explicit width of its own) explicitly, rather than relying on the flex stretch
+   default, which a vaadin-button's own internal sizing can otherwise resist. */
+.flyout-rail-column .touch-nav-item {
+    width: 100%;
+}
+
+/* NavItem's own row (content + chevron box) is passed to `new Button(row)`, which slots it into
+   vaadin-button's shadow-DOM ::part(label) — not a full-width content area, but an unstretched
+   span vaadin-button's own internal layout simply centers as a block within the (now correctly
+   widened, by the rule above) button. Without this, a short label's own row centers as a narrower
+   unit, and its chevron box lands wherever that unit's own right edge happens to fall — not the
+   button's — so chevron boxes across rows of different label lengths don't align. Stretching the
+   label part itself gives row's own width:100% (set in Java) a genuinely definite width to
+   resolve against, the same "percentage needs a definite parent" fix as .flyout-rail-popover-column
+   above, one shadow-DOM layer deeper. */
+.flyout-rail-column .touch-nav-item::part(label) {
+    flex: 1 1 auto;
+    width: 100%;
+}
+
+/* width:max-content, not left auto: a percentage width on a row inside this column (see
+   .flyout-rail-column .touch-nav-item below) needs a *definite* parent width to resolve against.
+   Left auto, the column still visually sizes to its widest child, but that's not a definite value
+   a descendant's own width:100% can compute against — the row's own width silently falls back to
+   its button's intrinsic size instead, out of step with the column's own (correctly-sized) frame.
+   max-content gives the column that same widest-child sizing as an explicit, definite length,
+   which 100% then resolves against correctly. The root column doesn't need this: its own width is
+   already definite via setSizeFull() against the rail's own slot. */
+.flyout-rail-popover-column {
+    max-height: 60vh;
+    width: max-content;
+}
+
+/* Row wrapping a branch's own icon+label content and its chevron box side by side — a sibling
+   relationship, not the chevron simply stacking into .touch-nav-content's own icon-over-label
+   column. stretch (not center) so the chevron box's own border-inline-start below spans this
+   row's full height, reading as a divider between the two zones rather than a short mid-height
+   tick. This is still one single tap target — see NavItem's own comment on why the click listener
+   lives on the Button itself, not scoped to either zone. */
+.flyout-rail-item-row {
+    display: flex;
+    align-items: stretch;
+    /* Breathing room between the label and the chevron box's own border-inline-start below —
+       without it, the divider sits flush against the label with nothing to visually separate. */
+    gap: var(--vaadin-gap-s);
+}
+
+.flyout-rail-item-row .touch-nav-content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Only exists on a NavItem that either is a branch itself, or shares a list with a sibling that
+   is (see FlyoutRailNavRenderer.populateList) — never unconditionally, so a list with no branches
+   at all reserves nothing and its rows use the full width, matching every other built-in
+   renderer's rows. A reserving-but-not-a-branch leaf's own box stays empty, with no border, but
+   still claims the same footprint (width + padding) an actual branch's does, so its icon+label
+   centers in the same column its branch siblings' does. */
+.flyout-rail-chevron-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    padding-inline: var(--vaadin-padding-s);
+}
+
+/* The thin, subtle rule separating an actual branch's chevron from its icon+label zone — not
+   another interactive-looking control, just a visual affordance that this item has more
+   underneath it. */
+.flyout-rail-chevron-box-active {
+    border-inline-start: 1px solid var(--vaadin-border-color-secondary);
+}
+
+.flyout-rail-chevron {
+    width: 16px;
+    height: 16px;
+}

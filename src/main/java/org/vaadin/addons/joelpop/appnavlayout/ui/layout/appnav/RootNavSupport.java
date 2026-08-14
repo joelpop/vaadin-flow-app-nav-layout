@@ -8,16 +8,23 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.nav.RouteNavUtils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * Shared root-node resolution for {@link NavRenderer}s that collapse every entry to one item per
- * root section, regardless of how deep its actual route nests — used by
+ * Shared nav-tree utilities for {@link NavRenderer}s in this package. {@link #rootOf},
+ * {@link #collectRootNodes}, {@link #firstChildOf}, and {@link #activeRootFor} collapse every
+ * entry to one item per root section, regardless of how deep its actual route nests — used by
  * {@link ScrollingTouchNavRenderer} and {@link ExpandingTouchNavRenderer}. Not used by
  * {@link AbstractTouchNavRenderer}'s own renderers, whose active-highlighting has an extra
- * "More" overflow-trigger case these don't need.
+ * "More" overflow-trigger case these don't need. {@link #childrenOf} and {@link #activeChainFor}
+ * don't collapse to root — they're for renderers that show the tree at every depth, such as
+ * {@link FlyoutRailNavRenderer}.
  */
 final class RootNavSupport {
 
@@ -67,5 +74,54 @@ final class RootNavSupport {
                 .max(Comparator.comparingInt(e -> RouteNavUtils.pathSegments(RouteNavUtils.normalizedPath(e)).size()))
                 .map(e -> rootOf(context.navGrouper().nodeFor(e)))
                 .orElse(null);
+    }
+
+    /**
+     * The parent→direct-children index for the current nav tree, to any depth. Built the same
+     * way {@link SideNavDrawerNavRenderer#ensureAncestors} walks ancestors when materializing the
+     * desktop drawer's nested {@code SideNav} — for every entry, its resolved node and every
+     * not-yet-seen ancestor above it are registered into their own parent's list, bottom-up.
+     */
+    static Map<NavNode, List<NavNode>> childrenOf(NavRenderContext context) {
+        var children = new LinkedHashMap<NavNode, List<NavNode>>();
+        var seen = new HashSet<NavNode>();
+        for (var entry : MenuConfiguration.getMenuEntries()) {
+            registerWithAncestors(context.navGrouper().nodeFor(entry), children, seen);
+        }
+        return children;
+    }
+
+    private static void registerWithAncestors(NavNode node, Map<NavNode, List<NavNode>> children,
+                                                Set<NavNode> seen) {
+        if (!seen.add(node)) {
+            return;
+        }
+        node.parent().ifPresent(parent -> {
+            children.computeIfAbsent(parent, unused -> new ArrayList<>()).add(node);
+            registerWithAncestors(parent, children, seen);
+        });
+    }
+
+    /**
+     * The entire ancestor chain (the most path-specific matching entry's own node, then every
+     * ancestor above it up to the root) for whichever entry is currently active, via the same
+     * {@link NavRenderContext#navPathMatcher()} resolution {@link #activeRootFor} uses — but
+     * returning every node along the way rather than stopping at the root, so a renderer can mark
+     * each ancestor group active too, not just the leaf itself. Empty if nothing matches.
+     */
+    static Set<NavNode> activeChainFor(NavRenderContext context) {
+        var path = context.currentPath();
+        var chain = new LinkedHashSet<NavNode>();
+        MenuConfiguration.getMenuEntries().stream()
+                .filter(e -> context.navPathMatcher().test(path, RouteNavUtils.normalizedPath(e)))
+                .max(Comparator.comparingInt(e -> RouteNavUtils.pathSegments(RouteNavUtils.normalizedPath(e)).size()))
+                .ifPresent(e -> {
+                    var node = context.navGrouper().nodeFor(e);
+                    while (node != null) {
+                        chain.add(node);
+                        node = node.parent().orElse(null);
+                    }
+                });
+        return chain;
     }
 }

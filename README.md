@@ -377,6 +377,16 @@ setPhoneNavRenderer(ScrollingTouchNavRenderer::new);
 
 Both public, no-arg constructors, same as the defaults.
 
+#### Built-in alternative for the tablet rail
+
+`FlyoutRailNavRenderer` never uses the shared drill-down bar at all. Instead, every rail item that represents a nav group gets a right-pointing chevron; tapping it pops up a flyout listing that group's own children — and if any of those are themselves groups, they get the same chevron-and-flyout treatment, recursively, to whatever depth the route hierarchy actually goes. Register it the same way as any other renderer:
+
+```java
+setTabletNavRenderer(FlyoutRailNavRenderer::new);
+```
+
+Public, no-arg constructor, same as the defaults.
+
 See [Alternatives](#alternatives) for screenshots of both in action, and [API Reference](#api-reference) for `NavRenderer`, `NavRenderContext`, and `NavSlots`.
 
 ### Supplying branding
@@ -582,6 +592,7 @@ See [Nav renderers](#nav-renderers) for configuring each of these pieces, and [A
 - **Per-scenario renderers** — independently swap the `NavRenderer` for any of the five device/orientation scenarios, or set both orientations of tablet/phone at once.
 - **Partial overrides** — subclass a built-in renderer to change just one behavior, e.g. override `createOverflowComponent()` to replace the "More" popover with your own presentation.
 - **Built-in phone touch bar alternatives** — `ScrollingTouchNavRenderer`/`ExpandingTouchNavRenderer` ship two ready-made, fully separate renderers for the phone scenario, each with its own overflow presentation (a scrolling strip, an expanding grid) — no subclassing required.
+- **Built-in tablet rail alternative** — `FlyoutRailNavRenderer` ships a chevron-and-flyout presentation for nested groups, in place of the shared drill-down bar.
 - **Custom `SideNavItem` rendering** — override `setNavNodeRenderer` for full control of the desktop drawer's item appearance.
 - **Configurable breakpoint** — adjust the physical-screen-size threshold that distinguishes tablet from phone (`setTabletMinShortSidePx`).
 - **Lifecycle hook** — react to nav-type changes via `onNavTypeChanged`/`NavTypeChangedEvent`.
@@ -674,6 +685,7 @@ never influences or queries how the tree is grouped.
 |------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `render(NavRenderContext context)` | Builds or updates this renderer's content for the current nav state. Called once when this scenario becomes active, again on every completed navigation, and again whenever nav configuration changes (grouper swap, path matcher change). Decides which slot(s) to populate and how — including any overflow/drill-down scaffolding it needs (a "More…" popover, a chevron, a swipeable container, etc). |
 | `navType()`                        | The chrome this renderer requires (`SIDENAV`, `RAIL`, or `TOUCH`) — determines which `NavStrategy` gets built for whichever scenario this renderer is configured for. Not a free choice: a renderer's `render()` already assumes one specific `NavSlots` accessor is live, and that slot is only live under the matching `NavType`'s strategy.                                                            |
+| `railWidth()`                       | Default `"5rem"`. Consulted only when `navType()` is `RAIL` — the rail's own width as a CSS length. Override when a renderer's items need more (or less) horizontal room than the built-ins' icon+label content alone, e.g. `FlyoutRailNavRenderer`'s own trailing chevron box.                                                                                                                          |
 
 ### `NavRenderContext`
 
@@ -730,6 +742,15 @@ Alternative `NavRenderer` for the phone scenario: root sections in a grid that e
 a chevron when there are more than fit, instead of the default "More" popover. The primary row
 always shows a fixed, even number of items; the rest sit in a collapsible section beneath it.
 Same shared drill-down bar as the other touch/rail renderers. Public, no-arg constructor.
+
+### `FlyoutRailNavRenderer`
+
+Alternative `NavRenderer` for the tablet scenario: every rail item that represents a nav group
+gets a right-pointing chevron instead of navigating to a representative child; tapping it pops up
+a flyout listing that group's own children, recursively, to whatever depth the route hierarchy
+actually goes. Unlike every other built-in touch/rail renderer, never touches
+`NavSlots.headerNav()` — the flyout cascade reaches every level of the tree directly, so the
+shared drill-down bar has nothing left to show. Public, no-arg constructor.
 
 ### `NavGrouper` (`@FunctionalInterface`)
 

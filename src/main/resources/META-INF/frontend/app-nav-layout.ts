@@ -114,8 +114,23 @@ GLOBAL_STYLES.replaceSync(`
         inset-inline-start: 0;
         z-index: 200;
         will-change: auto;
-        padding-block-start: var(--vaadin-padding-s);
-        padding-block-end: 0;
+        /* max(), not the plain theme constant alone: pinning inset-block-start to the literal
+           viewport top (above) means this part's own top edge can sit behind a device's status
+           bar/notch, unlike the ordinary bottom bar (whose top edge is never behind one) — this
+           file's own unscoped navbar-bottom rule, earlier above, deliberately resets exactly that
+           inherited safe-area padding back down to the plain constant, since it's correct for that
+           ordinary case but not this one. Falling back to whichever of the theme's own intended
+           breathing room or the device's real inset is larger keeps this part's first item clear
+           of that unsafe strip without discarding the theme's own value on non-notched devices,
+           where env() resolves to 0. */
+        padding-block-start: max(var(--vaadin-padding-s), env(safe-area-inset-top, 0px));
+        /* Same reasoning as padding-block-start above, at the opposite edge: inset-block-end is
+           also pinned to the literal viewport bottom, which can sit behind a device's home
+           indicator. Unlike the top, this edge's own plain value is 0 (items sit flush against
+           it by design, not offset by a themed constant), so there's no existing floor to
+           preserve with max() — env() with its own 0px fallback already covers the non-notched
+           case on its own. */
+        padding-block-end: env(safe-area-inset-bottom, 0px);
         /* --nav-rail-width is also what padding-inline-start on the host (below) uses to push
            routed content clear of the rail — that only lands correctly if this part's true
            rendered width is exactly --nav-rail-width, not merely its declared content width.
@@ -163,10 +178,12 @@ GLOBAL_STYLES.replaceSync(`
 
     /* Primary nav bar: display/flex-direction/justify-content/align-items are set inline from
        Java (AbstractTouchNavRenderer.ensureBuilt), since they depend on which of the two touch
-       renderers (rail vs. bottom bar) is active — only the theme-flavored bit (gap) lives here,
-       rail-scoped to match Java's own COLUMN-direction-only gap application. */
+       renderers (rail vs. bottom bar) is active. No gap here (unlike the bottom bar): once each
+       item's own height correctly fits its content (see vaadin-button.touch-nav-item below,
+       instead of being clipped down to Lumo's fixed default), items already read as comfortably
+       separated on their own, and an explicit gap on top reads as excessive. */
     vaadin-app-layout[nav-rail] .nav-bar {
-        gap: var(--vaadin-gap-m);
+        gap: 0;
     }
 
     /* Vertical space between wrapped rows of items in a .nav-bar that wraps onto multiple lines
@@ -178,16 +195,30 @@ GLOBAL_STYLES.replaceSync(`
         row-gap: var(--vaadin-gap-m);
     }
 
-    /* This is a real vaadin-button (theme="tertiary" — see AbstractTouchNavRenderer.navItem's own
-       comment for why), not a bare reset element, so only sizing is overridden here; the button's
-       own tertiary-variant CSS already supplies a transparent background and borderless look. */
+    /* This is a real vaadin-button (theme="tertiary" — see NavItem's own comment for why), not a
+       bare reset element, so only sizing is overridden here; the button's own tertiary-variant CSS
+       already supplies a transparent background and borderless look. */
     .touch-nav-item {
         /* Overrides the flex-item default (min-width:auto, which pins the shrink floor to the
            label's un-wrapped width) so an item can shrink below its own natural content width
            and .touch-nav-label's ellipsis can engage instead of forcing the bar/rail wider than
-           intended — see AbstractTouchNavRenderer.navItem's own comment for the full story. */
+           intended — see NavItem's own comment for the full story. */
         min-width: 0;
         padding: 0;
+    }
+
+    /* Lumo's own :host sets an explicit height (a fixed theme-scale value, not "auto"), which
+       silently clips this button's own slotted content — icon+label, sized via NavItem's own
+       .touch-nav-content, plus the shadow DOM's own ::part(label) padding — whenever their
+       combined real height exceeds that fixed value. Ordinarily invisible (the clipped portion
+       just never paints, no error, no visible artifact), except when this button sits inside a container
+       that scrolls (FlyoutRailNavRenderer's own flyouts): there, the sliver of content this rule
+       used to clip instead of accommodate shows up as spurious overflow, forcing a scrollbar for
+       content that should have fit. vaadin-button.touch-nav-item (tag+class) gives this rule
+       higher specificity than the plain :host selector's own (0,1,0), the same specificity-bump
+       technique used elsewhere in this add-on to win a cascade fight without !important. */
+    vaadin-button.touch-nav-item {
+        height: auto;
     }
 
     /* Row-direction (bottom bar) items share the bar's width equally; column-direction (rail)
@@ -196,16 +227,11 @@ GLOBAL_STYLES.replaceSync(`
         flex: 1 1 0;
     }
 
-    /* Rail items: vertical padding for comfortable tap targets. */
-    vaadin-app-layout[nav-rail] .touch-nav-item {
-        padding-block: var(--vaadin-padding-s);
-    }
-
     /* Icon+label layout for both touch/rail items and overflow-popover items lives on this inner
        wrapper, not the vaadin-button host itself — Button lacks HasComponents and setText(String)
        only appends a raw text node (no element to attach .touch-nav-label's styling to), so the
        icon and label are composed in a plain Div passed as the button's "icon" content instead;
-       see AbstractTouchNavRenderer.navItem's own comment. */
+       see NavItem's own comment. */
     .touch-nav-content {
         display: flex;
         flex-direction: column;
@@ -214,9 +240,9 @@ GLOBAL_STYLES.replaceSync(`
         min-width: 0;
     }
 
-    /* Stands in for the icon on a section that has none, at the same 20px footprint
-       AbstractTouchNavRenderer.navItem gives a real icon — see that method's own comment for why
-       this needs to take up the same space rather than being left out. */
+    /* Stands in for the icon on a section that has none, at the same 20px footprint NavItem
+       gives a real icon — see its own comment for why this needs to take up the same space
+       rather than being left out. */
     .touch-nav-icon-placeholder {
         width: 20px;
         height: 20px;
@@ -237,7 +263,7 @@ GLOBAL_STYLES.replaceSync(`
     }
 
     /* Active vs. inactive state for touch/rail/overflow nav items. Both are real vaadin-buttons
-       with theme="tertiary" (see AbstractTouchNavRenderer.navItem's own comment), whose own CSS
+       with theme="tertiary" (see NavItem's own comment), whose own CSS
        already colors the button's text in the active theme's own accent (Lumo blue, Aura's
        accent, or a neutral default under base) — exactly the behavior the user expects to match
        vaadin-side-nav-item's own selected-item color. Inactive items override that back down to

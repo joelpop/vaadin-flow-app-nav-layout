@@ -2,7 +2,6 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasComponents;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dependency.CssImport;
@@ -40,7 +39,7 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
     private NavRenderContext cachedContext;
     private int windowWidth = 5 * ITEM_PX;
     private Registration resizeRegistration;
-    private final Map<NavNode, Button> navButtons = new LinkedHashMap<>();
+    private final Map<NavNode, NavItem> navItems = new LinkedHashMap<>();
     private FlexLayout bar;
     private Div wrapper;
     private Button leftChevron;
@@ -97,21 +96,21 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
             }
         });
 
-        // Built with the exact same structure AbstractTouchNavRenderer.navItem gives a regular
-        // nav item — icon + a same-class label placeholder inside .touch-nav-content, wrapped via
-        // new Button(content), with the .touch-nav-item class for the same padding/min-width
-        // reset — rather than an icon-only button sized by a guessed pixel value. Height is never
-        // set anywhere here: however tall that construction resolves to under whatever theme is
-        // actually active (fit-content under the base theme, --lumo-button-size under Lumo's
-        // compatibility CSS, whatever Aura does) is exactly how tall a real nav item resolves to
-        // too, since it's the identical construction — so the two are guaranteed to match without
-        // this add-on ever having to know or guess what that height actually is. The label
-        // placeholder is what makes that guarantee hold: an icon-only button and an icon+label
-        // button don't resolve to the same fit-content height, so pairing the chevron's icon with
-        // an empty (but real, same-class) label keeps its content shape identical to a real item's,
-        // the same reasoning navItem's own icon placeholder applies in the other direction for a
-        // section with no icon. theme="tertiary" (not new Button(content) alone) is what picks up
-        // the active theme's own accent color, the same mechanism createNavButton relies on — there
+        // Built with the exact same structure NavItem gives a regular nav item — icon + a
+        // same-class label placeholder inside .touch-nav-content, wrapped via new Button(content),
+        // with the .touch-nav-item class for the same padding/min-width reset — rather than an
+        // icon-only button sized by a guessed pixel value. Height is never set anywhere here:
+        // however tall that construction resolves to under whatever theme is actually active
+        // (fit-content under the base theme, --lumo-button-size under Lumo's compatibility CSS,
+        // whatever Aura does) is exactly how tall a real nav item resolves to too, since it's the
+        // identical construction — so the two are guaranteed to match without this add-on ever
+        // having to know or guess what that height actually is. The label placeholder is what
+        // makes that guarantee hold: an icon-only button and an icon+label button don't resolve
+        // to the same fit-content height, so pairing the chevron's icon with an empty (but real,
+        // same-class) label keeps its content shape identical to a real item's, the same reasoning
+        // NavItem's own icon placeholder applies in the other direction for a section with no
+        // icon. theme="tertiary" (not new Button(content) alone) is what picks up
+        // the active theme's own accent color, the same mechanism NavItem relies on — there
         // being no generic --vaadin-* accent-color token to reach for instead. NOT the
         // "touch-nav-item" class itself, though — that class's own :not(.active) rule forces the
         // muted secondary color, and a chevron never becomes .active (it's not a route item), so it
@@ -165,7 +164,7 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
     // Called on slot change and window resize. Rebuilds buttons and updates the
     // scrolling-touch-nav-has-overflow class that CSS and JS use to control chevron visibility.
     private void buildItems(NavRenderContext context) {
-        navButtons.clear();
+        navItems.clear();
         bar.removeAll();
 
         var rootNodes = RootNavSupport.collectRootNodes(context);
@@ -189,12 +188,12 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
                .remove("justify-content");
 
             for (var node : rootNodes) {
-                var button = createNavButton(node, context);
-                button.getStyle()
-                      .set("flex", "0 0 " + itemWidth)
-                      .set("scroll-snap-align", "start");
-                navButtons.put(node, button);
-                bar.add(button);
+                var item = createNavItem(node, context);
+                item.getStyle()
+                    .set("flex", "0 0 " + itemWidth)
+                    .set("scroll-snap-align", "start");
+                navItems.put(node, item);
+                bar.add(item);
             }
 
             leftChevron.getStyle().set("flex", "0 0 " + CHEVRON_ZONE_PX + "px");
@@ -212,10 +211,10 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
                .set("justify-content", "space-evenly");
 
             for (var node : rootNodes) {
-                var button = createNavButton(node, context);
-                button.getStyle().set("flex", "1");
-                navButtons.put(node, button);
-                bar.add(button);
+                var item = createNavItem(node, context);
+                item.getStyle().set("flex", "1");
+                navItems.put(node, item);
+                bar.add(item);
             }
 
             leftChevron.getStyle().set("flex", "0 0 0");
@@ -224,52 +223,19 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         }
     }
 
-    private Button createNavButton(NavNode node, NavRenderContext context) {
+    private NavItem createNavItem(NavNode node, NavRenderContext context) {
         var icon = node.createIcon().orElse(null);
         if (icon != null) {
             icon.setSize("20px");
         }
-
-        var label = new Span(node.title());
-        label.addClassName("touch-nav-label");
-
-        var content = new Div();
-        content.addClassName("touch-nav-content");
-        // Button's height is fit-content around whatever this Div contains, so a section with no
-        // icon needs an icon-sized *empty* placeholder here, not to be left out entirely — see
-        // AbstractTouchNavRenderer.navItem's own comment for why: omitting it makes that item's
-        // whole button shorter than its icon-bearing siblings in the same row, shifting its label
-        // to a different vertical position. touch-nav-icon-placeholder is already loaded globally
-        // via app-nav-layout.ts, not redefined here.
-        if (icon != null) {
-            content.add(icon);
-        }
-        else {
-            var placeholder = new Div();
-            placeholder.addClassName("touch-nav-icon-placeholder");
-            content.add(placeholder);
-        }
-        content.add(label);
-
-        var button = new Button();
-        button.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        button.addClassName("touch-nav-item");
-        button.getElement().appendChild(content.getElement());
-
         Class<? extends Component> targetClass = node.menuEntry()
                 .<Class<? extends Component>>map(MenuEntry::menuClass)
                 .orElseGet(() -> RootNavSupport.firstChildOf(node, context));
-        if (targetClass != null) {
-            final var tc = targetClass;
-            button.addClickListener(e -> UI.getCurrent().navigate(tc));
-        }
-
-        return button;
+        return new NavItem(node.title(), icon, targetClass);
     }
 
     private void highlightActive(NavRenderContext context) {
         var activeRoot = RootNavSupport.activeRootFor(context);
-        navButtons.forEach((node, button) ->
-                button.getElement().getClassList().set("active", Objects.equals(node, activeRoot)));
+        navItems.forEach((node, item) -> item.setActive(Objects.equals(node, activeRoot)));
     }
 }
