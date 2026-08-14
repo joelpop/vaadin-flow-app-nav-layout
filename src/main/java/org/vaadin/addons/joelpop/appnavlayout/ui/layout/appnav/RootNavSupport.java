@@ -13,18 +13,18 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
  * Shared nav-tree utilities for {@link NavRenderer}s in this package. {@link #rootOf},
  * {@link #collectRootNodes}, {@link #firstChildOf}, and {@link #activeRootFor} collapse every
  * entry to one item per root section, regardless of how deep its actual route nests — used by
- * {@link ScrollingTouchNavRenderer} and {@link ExpandingTouchNavRenderer}. Not used by
- * {@link AbstractTouchNavRenderer}'s own renderers, whose active-highlighting has an extra
- * "More" overflow-trigger case these don't need. {@link #childrenOf} and {@link #activeChainFor}
- * don't collapse to root — they're for renderers that show the tree at every depth, such as
- * {@link FlyoutRailNavRenderer}.
+ * {@link ScrollingTouchNavRenderer}, {@link ExpandingTouchNavRenderer}, and
+ * {@link HeaderTabsNavRenderer}. Not used by {@link AbstractTouchNavRenderer}'s own renderers,
+ * whose active-highlighting has an extra "More" overflow-trigger case these don't need.
+ * {@link #childrenOf} and {@link #activeChainFor} don't collapse to root — they're for renderers
+ * that show the tree at every depth, such as {@link FlyoutRailNavRenderer}.
  */
 final class RootNavSupport {
 
@@ -49,15 +49,21 @@ final class RootNavSupport {
         return new ArrayList<>(seen.keySet());
     }
 
+    /** The first {@link MenuEntry} found under {@code groupNode} whose route has a real view
+     *  class — the entry {@link #firstChildOf} extracts its class from, exposed here in full for
+     *  callers needing more than just the class (e.g. {@link HeaderTabsNavRenderer}'s own
+     *  explore trigger, which needs the entry's own path, not just its view). */
+    static Optional<MenuEntry> firstChildEntryOf(NavNode groupNode, NavRenderContext context) {
+        return MenuConfiguration.getMenuEntries().stream()
+                .filter(e -> rootOf(context.navGrouper().nodeFor(e)) == groupNode)
+                .filter(e -> e.menuClass() != null)
+                .findFirst();
+    }
+
     /** The view class of the first leaf found under {@code groupNode} — for a group item (no
      *  {@code menuEntry()} of its own) that still needs somewhere to navigate on click. */
     static Class<? extends Component> firstChildOf(NavNode groupNode, NavRenderContext context) {
-        return MenuConfiguration.getMenuEntries().stream()
-                .filter(e -> rootOf(context.navGrouper().nodeFor(e)) == groupNode)
-                .map(MenuEntry::menuClass)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
+        return firstChildEntryOf(groupNode, context).map(MenuEntry::menuClass).orElse(null);
     }
 
     /**

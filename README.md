@@ -49,7 +49,7 @@ public class ProductsView extends Div {
 
 This produces a nav item with the title "Products" and the "package" icon from the `vaadin` icon set.
 
-#### Supplying alternate icon and title generators
+#### Supplying alternative icon and title generators
 
 If your application has an alternative means of specifying view icons and titles (such as custom view annotations, an enum, or a map), wire `setViewIconGenerator`/`setViewTitleGenerator` to read them instead. Returning `null` for a given view falls back to the above default.
 
@@ -335,7 +335,7 @@ public class MainLayout extends AppNavLayout {
 
 ### Nav renderers
 
-Which chrome a scenario gets (drawer, bottom bar, or rail) comes from whichever `NavRenderer` is configured for it, not from a separate choice.
+Which chrome a scenario gets (drawer, bottom bar, rail, or header tab strip) comes from whichever `NavRenderer` is configured for it, not from a separate choice.
 
 #### Default behavior
 
@@ -387,6 +387,16 @@ setTabletNavRenderer(FlyoutRailNavRenderer::new);
 
 Public, no-arg constructor, same as the defaults.
 
+#### Built-in alternative: header tab strip
+
+`HeaderTabsNavRenderer` builds no drawer, rail, or bottom bar at all — root sections render as a `Tabs` strip spanning the header, alongside brand and user content. Selecting a leaf navigates directly; selecting a group only reveals that root's own children in the same shared drill-down bar every other touch/rail renderer already uses (here shown as a second row beneath the tab strip instead of beneath a rail or bottom bar) — it never navigates on its own, at either level. Losing focus on the whole nav hierarchy without ever landing on a leaf restores both rows to whatever the real current view actually is. Register it for whichever scenario should use it — a wide desktop viewport is the natural fit, but nothing restricts it to that scenario:
+
+```java
+setDesktopNavRenderer(HeaderTabsNavRenderer::new);
+```
+
+Public, no-arg constructor, same as the defaults.
+
 See [Alternatives](#alternatives) for screenshots of both in action, and [API Reference](#api-reference) for `NavRenderer`, `NavRenderContext`, and `NavSlots`.
 
 ### Supplying branding
@@ -424,7 +434,7 @@ public class ProductsView extends Div implements HasViewHeaderTitle {
 }
 ```
 
-#### Supplying alternate header title pieces
+#### Supplying alternative header title pieces
 
 Override `getViewHeaderSuffix()` to append a badge or other trailing component:
 
@@ -538,22 +548,38 @@ But you aren't stuck with the default renderers. There are some alternative rend
 
 <table>
 <tr>
+<td align="center" colspan="2">
+<img src="README/alternative/desktop-header.png" width="480"><br>
+<sub><b>Desktop</b> — <code>SIDENAV</code> drawer</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="40%">
+<img src="README/alternative/tablet-portrait-flyout-rail.png" width="220"><br>
+<sub><b>Tablet, portrait</b> — <code>RAIL</code></sub>
+</td>
 <td align="center">
-<img src="README/custom/phone-portrait-unscrolled.png" width="140"><br>
+<img src="README/alternative/tablet-landscape-flyout-rail.png" width="320"><br>
+<sub><b>Tablet, landscape</b> — <code>RAIL</code></sub>
+</td>
+</tr>
+<tr>
+<td align="center">
+<img src="README/alternative/phone-portrait-unscrolled.png" width="140"><br>
 <sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a side-to-side scroller (unscrolled)</sub>
 </td>
 <td align="center">
-<img src="README/custom/phone-portrait-scrolled.png" width="140"><br>
+<img src="README/alternative/phone-portrait-scrolled.png" width="140"><br>
 <sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a side-to-side scroller (scrolled)</sub>
 </td>
 </tr>
 <tr>
 <td align="center">
-<img src="README/custom/phone-portrait-collapsed.png" width="140"><br>
+<img src="README/alternative/phone-portrait-collapsed.png" width="140"><br>
 <sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into an expander (collapsed)</sub>
 </td>
 <td align="center">
-<img src="README/custom/phone-portrait-expanded.png" width="140"><br>
+<img src="README/alternative/phone-portrait-expanded.png" width="140"><br>
 <sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into an expander (expanded)</sub>
 </td>
 </tr>
@@ -565,7 +591,7 @@ But you aren't stuck with the default renderers. There are some alternative rend
 
 `AppNavLayout` builds one nav tree from your routes, then hands that same tree to a different renderer depending on the device. The tree itself — a graph of `NavNode`s built by whichever `NavGrouper` is configured — has no idea what device it'll be shown on; the two decisions are made independently and only combined at render time. That's what lets a `SideNav` drawer, a touch bottom bar, and a side rail all stay in sync with the same routes without three separate components to maintain.
 
-`AppNavLayout` distinguishes five device/orientation scenarios (desktop, tablet portrait, tablet landscape, phone portrait, phone landscape), each with its own configurable `NavRenderer`. On attach, it reads touch capability and screen size to resolve the current scenario, which determines both the `NavRenderer` and the `NavType` it declares (`SIDENAV`, `RAIL`, or `TOUCH`) — `SIDENAV` builds a `DesktopNavStrategy` (a full `SideNav` in the drawer), `RAIL`/`TOUCH` build a `TouchNavStrategy` (an icon bar or rail, plus a two-level drill-down header for nested routes). A `Signal.effect` on the window size re-evaluates this on every rotation or resize, swapping chrome in place with no page reload — though if the newly-resolved scenario still points at the same `NavRenderer` instance as before (tablet's two orientations share one by default), nothing tears down and rebuilds; only the item count/layout inside that renderer adjusts.
+`AppNavLayout` distinguishes five device/orientation scenarios (desktop, tablet portrait, tablet landscape, phone portrait, phone landscape), each with its own configurable `NavRenderer`. On attach, it reads touch capability and screen size to resolve the current scenario, which determines both the `NavRenderer` and the `NavType` it declares (`SIDENAV`, `RAIL`, `TOUCH`, or `HEADER`) — `SIDENAV` builds a `DesktopNavStrategy` (a full `SideNav` in the drawer), `RAIL`/`TOUCH` build a `TouchNavStrategy` (an icon bar or rail, plus a two-level drill-down header for nested routes), `HEADER` builds a `HeaderNavStrategy` (a tab strip spanning the header, alongside brand/user content, plus the same two-level drill-down beneath it). A `Signal.effect` on the window size re-evaluates this on every rotation or resize, swapping chrome in place with no page reload — though if the newly-resolved scenario still points at the same `NavRenderer` instance as before (tablet's two orientations share one by default), nothing tears down and rebuilds; only the item count/layout inside that renderer adjusts.
 
 See [Nav renderers](#nav-renderers) for configuring each of these pieces, and [API Reference](#api-reference) for the full `NavRenderer`/`NavStrategy`/`NavType` picture.
 
@@ -593,6 +619,7 @@ See [Nav renderers](#nav-renderers) for configuring each of these pieces, and [A
 - **Partial overrides** — subclass a built-in renderer to change just one behavior, e.g. override `createOverflowComponent()` to replace the "More" popover with your own presentation.
 - **Built-in phone touch bar alternatives** — `ScrollingTouchNavRenderer`/`ExpandingTouchNavRenderer` ship two ready-made, fully separate renderers for the phone scenario, each with its own overflow presentation (a scrolling strip, an expanding grid) — no subclassing required.
 - **Built-in tablet rail alternative** — `FlyoutRailNavRenderer` ships a chevron-and-flyout presentation for nested groups, in place of the shared drill-down bar.
+- **Built-in header tab strip alternative** — `HeaderTabsNavRenderer` ships a `Tabs` strip spanning the header in place of a drawer, rail, or bottom bar, for any scenario.
 - **Custom `SideNavItem` rendering** — override `setNavNodeRenderer` for full control of the desktop drawer's item appearance.
 - **Configurable breakpoint** — adjust the physical-screen-size threshold that distinguishes tablet from phone (`setTabletMinShortSidePx`).
 - **Lifecycle hook** — react to nav-type changes via `onNavTypeChanged`/`NavTypeChangedEvent`.
@@ -684,7 +711,7 @@ never influences or queries how the tree is grouped.
 | Method                             | Description                                                                                                                                                                                                                                                                                                                                                                                               |
 |------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `render(NavRenderContext context)` | Builds or updates this renderer's content for the current nav state. Called once when this scenario becomes active, again on every completed navigation, and again whenever nav configuration changes (grouper swap, path matcher change). Decides which slot(s) to populate and how — including any overflow/drill-down scaffolding it needs (a "More…" popover, a chevron, a swipeable container, etc). |
-| `navType()`                        | The chrome this renderer requires (`SIDENAV`, `RAIL`, or `TOUCH`) — determines which `NavStrategy` gets built for whichever scenario this renderer is configured for. Not a free choice: a renderer's `render()` already assumes one specific `NavSlots` accessor is live, and that slot is only live under the matching `NavType`'s strategy.                                                            |
+| `navType()`                        | The chrome this renderer requires (`SIDENAV`, `RAIL`, `TOUCH`, or `HEADER`) — determines which `NavStrategy` gets built for whichever scenario this renderer is configured for. Not a free choice: a renderer's `render()` already assumes one specific `NavSlots` accessor is live, and that slot is only live under the matching `NavType`'s strategy.                                                            |
 | `railWidth()`                       | Default `"5rem"`. Consulted only when `navType()` is `RAIL` — the rail's own width as a CSS length. Override when a renderer's items need more (or less) horizontal room than the built-ins' icon+label content alone, e.g. `FlyoutRailNavRenderer`'s own trailing chevron box.                                                                                                                          |
 
 ### `NavRenderContext`
@@ -701,14 +728,15 @@ Passed to `NavRenderer.render(...)`.
 ### `NavSlots`
 
 `AppNavLayout`'s whole shape, exposed identically to every renderer regardless of scenario — a
-renderer sees all four locations and decides for itself which are relevant to it.
+renderer sees all five locations and decides for itself which are relevant to it.
 
 | Method        | Description                                                                                                                                                              |
 |---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `drawer()`    | Desktop nav location, inside the drawer.                                                                                                                                 |
 | `sideRail()`  | Tablet nav location (both orientations), the left-edge rail.                                                                                                             |
 | `touchBar()`  | Phone nav location, the bottom bar.                                                                                                                                      |
-| `headerNav()` | Shared drill-down location for nested routes, alongside `sideRail()`/`touchBar()`. Distinct from the per-view header slot (see [View header title](#view-header-title)). |
+| `headerNav()` | Shared drill-down location for nested routes, alongside `sideRail()`/`touchBar()`, or beneath `tabStrip()`'s own row under `HEADER`. Distinct from the per-view header slot (see [View header title](#view-header-title)). |
+| `tabStrip()`  | Header nav location, a primary tab strip spanning the header alongside brand/user content.                                                                              |
 
 ### `SideNavDrawerNavRenderer`
 
@@ -751,6 +779,16 @@ a flyout listing that group's own children, recursively, to whatever depth the r
 actually goes. Unlike every other built-in touch/rail renderer, never touches
 `NavSlots.headerNav()` — the flyout cascade reaches every level of the tree directly, so the
 shared drill-down bar has nothing left to show. Public, no-arg constructor.
+
+### `HeaderTabsNavRenderer`
+
+Alternative `NavRenderer` for `NavType.HEADER`: root sections render as a `Tabs` strip in
+`NavSlots.tabStrip()`, spanning the header alongside brand/user content, instead of a drawer,
+rail, or bottom bar. Selecting a leaf navigates directly; selecting a group only reveals that
+root's own children in the same shared drill-down bar every other touch/rail renderer uses, via
+`NavSlots.headerNav()` — it never navigates on its own, at either level, and losing focus on the
+whole nav hierarchy without ever landing on a leaf restores both rows to the real current view.
+Public, no-arg constructor.
 
 ### `NavGrouper` (`@FunctionalInterface`)
 
@@ -812,7 +850,7 @@ Stateless static helpers.
 
 | Type          | Constants                                                                                                                                                                                                      |
 |---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `NavType`     | `TOUCH` — touch bottom bar + secondary tabs. `RAIL` — permanent left-strip icon rail. `SIDENAV` — drawer-based `SideNav`. Declared by the active scenario's `NavRenderer.navType()`, not chosen independently. |
+| `NavType`     | `TOUCH` — touch bottom bar + secondary tabs. `RAIL` — permanent left-strip icon rail. `SIDENAV` — drawer-based `SideNav`. `HEADER` — header tab strip + drill-down row. Declared by the active scenario's `NavRenderer.navType()`, not chosen independently. |
 | `DeviceType`  | `PHONE`, `TABLET`, `DESKTOP` — detected from touch capability and screen size. Defaults to `DESKTOP` before the async client round-trip completes, and for any non-touch device.                               |
 | `Orientation` | `PORTRAIT`, `LANDSCAPE` — re-evaluated on window resize for touch devices. Defaults to `LANDSCAPE` before the client round-trip completes.                                                                     |
 

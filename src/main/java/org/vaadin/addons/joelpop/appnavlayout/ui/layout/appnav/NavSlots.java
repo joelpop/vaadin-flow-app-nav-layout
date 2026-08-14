@@ -20,9 +20,17 @@ public interface NavSlots {
 
     /**
      * The shared drill-down location for nested routes, shown alongside {@link #sideRail()} or
-     * {@link #touchBar()}. Distinct from the per-view header slot used by
+     * {@link #touchBar()} — or beneath {@link #tabStrip()}'s own row under
+     * {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#HEADER}. Distinct from the
+     * per-view header slot used by
      * {@link org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderTitle}/
      * {@link org.vaadin.addons.joelpop.appnavlayout.ui.view.HasViewHeaderComponent}.
      */
     HasComponents headerNav();
+
+    /**
+     * The header nav location ({@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#HEADER}
+     * only), a primary tab strip spanning the header alongside the brand and user content.
+     */
+    HasComponents tabStrip();
 }

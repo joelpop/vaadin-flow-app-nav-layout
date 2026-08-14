@@ -110,6 +110,16 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     // Always-present layout containers
     final HorizontalLayout topBar;
     final HorizontalLayout viewHeaderSlot;
+    // The VerticalLayout stacking topBar and viewHeaderSlot as full-width header rows — private,
+    // not exposed directly; a NavStrategy needing an additional row goes through
+    // insertHeaderRow()/removeHeaderRow() below instead, so this class keeps ownership of its own
+    // structure rather than letting a strategy reach in and manipulate it directly.
+    private final VerticalLayout topBlock;
+    // The always-present drawer toggle, shown by default; hidden only by a NavStrategy whose
+    // NavType has no drawer to toggle (currently HeaderNavStrategy) via
+    // setDrawerToggleVisible() below, rather than exposing this field for a strategy to call
+    // .setVisible() on directly.
+    private final DrawerToggle drawerToggle;
 
     private NavType activeNavType;
     private NavStrategy activeStrategy;
@@ -190,7 +200,8 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         // when viewHeaderSlot is hidden; see the topBarYStableWhen* IT tests.
         topBar.getStyle().set("min-height", "var(--lumo-size-xl)");
         topBar.addClassName("app-top-bar");
-        topBar.add(new DrawerToggle());
+        drawerToggle = new DrawerToggle();
+        topBar.add(drawerToggle);
 
         viewHeaderSlot = new HorizontalLayout();
         viewHeaderSlot.setWidthFull();
@@ -199,7 +210,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         viewHeaderSlot.addClassName("view-header-slot");
         viewHeaderSlot.setVisible(false);
 
-        var topBlock = new VerticalLayout();
+        topBlock = new VerticalLayout();
         topBlock.setPadding(false);
         topBlock.setSpacing(false);
         topBlock.setWidthFull();
@@ -209,6 +220,30 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         // Fires immediately with currentViewSignal == null, before any NavStrategy exists;
         // rebuildViewHeader() explicitly no-ops in that case (see its activeStrategy == null guard).
         Signal.effect(this, () -> rebuildViewHeader(currentViewSignal.get()));
+    }
+
+    // ——————————— Header row / drawer toggle access for NavStrategy implementations ————————————
+
+    /**
+     * Inserts {@code row} as an additional full-width header row, between {@link #topBar} and
+     * {@link #viewHeaderSlot} — for a {@link NavStrategy} whose chrome needs more than
+     * {@code topBar}'s own single row (e.g. {@link HeaderNavStrategy}'s own drill-down row).
+     */
+    void insertHeaderRow(Component row) {
+        topBlock.addComponentAtIndex(1, row);
+    }
+
+    /** Removes a row previously added via {@link #insertHeaderRow}. */
+    void removeHeaderRow(Component row) {
+        topBlock.remove(row);
+    }
+
+    /**
+     * Shows or hides the shared {@link DrawerToggle} — hidden by a {@link NavStrategy} whose
+     * {@link NavType} has no drawer to toggle (currently only {@link HeaderNavStrategy}).
+     */
+    void setDrawerToggleVisible(boolean visible) {
+        drawerToggle.setVisible(visible);
     }
 
     // ——————————— Nav-type switching ————————————
@@ -244,9 +279,11 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         var previousNavType = this.activeNavType;
         this.activeRenderer = renderer;
         this.activeNavType = navType;
-        activeStrategy = (navType == NavType.SIDENAV)
-                ? new DesktopNavStrategy(this)
-                : new TouchNavStrategy(this, navType);
+        activeStrategy = switch (navType) {
+            case SIDENAV -> new DesktopNavStrategy(this);
+            case HEADER -> new HeaderNavStrategy(this);
+            case TOUCH, RAIL -> new TouchNavStrategy(this, navType);
+        };
         buildNav();
         navState = NavState.BUILT;
         placeBrandAndUserContent();
@@ -637,14 +674,15 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     /**
-     * Returns {@code true} if this session is using touch or rail nav (not desktop SideNav).
+     * Returns {@code true} if this session is using touch or rail nav (not desktop SideNav or
+     * header tabs).
      *
      * <p>Returns {@code false} before the first {@link #onAttach(AttachEvent)} completes,
      * because device detection requires a client round-trip. Do not call this from a
      * subclass constructor.
      */
     protected boolean isMobile() {
-        return activeNavType != null && activeNavType != NavType.SIDENAV;
+        return activeNavType == NavType.TOUCH || activeNavType == NavType.RAIL;
     }
 
     // ——————————— Escape hatch ————————————

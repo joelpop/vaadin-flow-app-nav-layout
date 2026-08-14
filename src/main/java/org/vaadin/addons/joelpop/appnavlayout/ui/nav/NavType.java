@@ -12,5 +12,7 @@ public enum NavType {
     /** Permanent left-strip icon rail. */
     RAIL,
     /** Drawer-based {@code SideNav}. */
-    SIDENAV
+    SIDENAV,
+    /** Header tab strip, with a drill-down row beneath for a group's children. */
+    HEADER
 }

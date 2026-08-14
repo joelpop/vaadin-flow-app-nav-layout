@@ -6,25 +6,29 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.sidenav.SideNav;
 
-/** {@link NavStrategy} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#SIDENAV}:
- *  header brand/user content, plus a drawer nav slot rendered by whichever {@link NavRenderer}
- *  is active for the current scenario (default: {@link SideNavDrawerNavRenderer}, building a
- *  {@link SideNav}). */
-final class DesktopNavStrategy implements NavStrategy {
+/**
+ * {@link NavStrategy} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#HEADER}:
+ * a primary tab strip spanning the header, alongside brand/user content, rendered by whichever
+ * {@link NavRenderer} is active for the current scenario (e.g. {@link HeaderTabsNavRenderer}),
+ * plus a drill-down row beneath it for a group's children. No drawer — the shared
+ * {@link com.vaadin.flow.component.applayout.DrawerToggle} is hidden while this strategy is
+ * active, restored once it tears down.
+ */
+final class HeaderNavStrategy implements NavStrategy {
 
     private final AppNavLayout owner;
 
     private HorizontalLayout brandContainer;
     private HorizontalLayout userContainer;
-    private VerticalLayout drawerNavSlot;
-    // Unused by this NavType — shared, never-attached placeholder so NavRenderer implementations
-    // can safely call any NavSlots accessor without a null check.
+    private Div tabStripSlot;
+    private Div headerNavSlot;
+    // Unused by this NavType (the drawer, sideRail, touchBar) — shared, never-attached
+    // placeholder so NavRenderer implementations can safely call any NavSlots accessor without a
+    // null check.
     private final Div inertSlot = new Div();
 
-    DesktopNavStrategy(AppNavLayout owner) {
+    HeaderNavStrategy(AppNavLayout owner) {
         this.owner = owner;
     }
 
@@ -38,26 +42,36 @@ final class DesktopNavStrategy implements NavStrategy {
         userContainer.setPadding(false);
         userContainer.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
 
-        owner.topBar.add(brandContainer, userContainer);
-        owner.topBar.expand(brandContainer);
+        tabStripSlot = new Div();
+        tabStripSlot.setWidthFull();
+        // Allows the tab strip to shrink below its content width inside the flex topBar row (the
+        // flex-item default min-width:auto would otherwise force topBar to overflow) — same
+        // reasoning as TouchNavStrategy's own headerNavSlot.
+        tabStripSlot.getStyle().set("min-width", "0");
+
+        owner.topBar.add(brandContainer, tabStripSlot, userContainer);
+        // The tab strip is what should grow to fill available space, not the brand — unlike
+        // DesktopNavStrategy, which has nothing else competing for that space.
+        owner.topBar.expand(tabStripSlot);
+        owner.setDrawerToggleVisible(false);
+
+        headerNavSlot = new Div();
+        headerNavSlot.setWidthFull();
+        owner.insertHeaderRow(headerNavSlot);
 
         owner.viewHeaderSlot.addClassName("view-header-slot-bordered");
-
-        drawerNavSlot = new VerticalLayout();
-        drawerNavSlot.setPadding(false);
-        drawerNavSlot.setSpacing(false);
-        drawerNavSlot.setSizeFull();
-        owner.addToDrawer(drawerNavSlot);
     }
 
     @Override
     public void tearDown() {
-        owner.topBar.remove(brandContainer, userContainer);
-        drawerNavSlot.getElement().removeFromParent();
+        owner.topBar.remove(brandContainer, tabStripSlot, userContainer);
+        owner.setDrawerToggleVisible(true);
+        owner.removeHeaderRow(headerNavSlot);
         owner.viewHeaderSlot.removeClassName("view-header-slot-bordered");
         brandContainer = null;
         userContainer = null;
-        drawerNavSlot = null;
+        tabStripSlot = null;
+        headerNavSlot = null;
     }
 
     @Override
@@ -72,7 +86,7 @@ final class DesktopNavStrategy implements NavStrategy {
 
     @Override
     public void populate() {
-        var slots = new NavSlotsImpl(drawerNavSlot, inertSlot, inertSlot, inertSlot, inertSlot);
+        var slots = new NavSlotsImpl(inertSlot, inertSlot, inertSlot, headerNavSlot, tabStripSlot);
         var context = new NavRenderContextImpl(
                 owner.navGrouper, owner.navigationSignal.peek().getPath(), slots, owner.navPathMatcher);
         owner.activeRenderer.render(context);
