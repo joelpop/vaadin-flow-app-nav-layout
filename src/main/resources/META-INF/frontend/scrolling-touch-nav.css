@@ -24,10 +24,7 @@
    case — overflow:hidden keeps the icon from poking out of that collapsed box. Expanded, that
    flex-basis is CHEVRON_ZONE_PX: a real tap target sized to fill the chevron's whole allotted
    area, not just however wide its icon+placeholder content happens to be on its own. Color comes
-   from the Button's own theme="tertiary" styling, not a rule here. No height override here at
-   all — ScrollingTouchNavRenderer builds the chevron with the exact same icon+label-placeholder
-   structure as a regular nav item, so its height already matches one under whatever theme is
-   active without this add-on needing to know or guess what that height actually is.
+   from the Button's own theme="tertiary" styling, not a rule here.
    padding/min-width are reset the same way .touch-nav-item resets them for a regular item (see
    app-nav-layout.ts) — applied directly here rather than by also giving the chevron the
    "touch-nav-item" class itself, since that class's own :not(.active) rule would permanently
@@ -45,6 +42,21 @@
     padding: 0;
     min-width: 0;
     background: var(--vaadin-background-container);
+}
+
+/* Lumo's own :host still pins this button to its old fixed height, the same clipping app-nav-
+   layout.ts's own vaadin-button.touch-nav-item rule fixes for a regular item — but this button
+   deliberately never carries that class (see the comment above), so it needs the same fix
+   restated here rather than inherited. Without it, a regular item now grows via height:auto to
+   fit its own content while the chevron stays pinned to the theme's old fixed height; on
+   .scrolling-touch-nav-wrapper's own align-items:stretch, an item with an explicit height doesn't
+   actually stretch, so the chevron ends up sitting at the top of the (now taller) row instead of
+   centered in it. vaadin-button.scrolling-touch-nav-chevron-left/-right (tag+class) gives this
+   rule higher specificity than the plain :host selector's own, the same technique
+   app-nav-layout.ts uses for the regular item's own rule. */
+vaadin-button.scrolling-touch-nav-chevron-left,
+vaadin-button.scrolling-touch-nav-chevron-right {
+    height: auto;
 }
 
 /* Reserves a real label's line-box height (see ScrollingTouchNavRenderer's own comment) without
