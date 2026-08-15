@@ -21,6 +21,7 @@ import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.shared.Registration;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -57,7 +58,7 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
     private final HorizontalLayout headerNavBar;
     private final Button backButton;
     private final Tabs tabs;
-    private final Map<Tab, MenuEntry> tabEntries = new HashMap<>();
+    private final Map<Tab, Canonical> tabTargets = new HashMap<>();
     private String currentPath;
     private String currentRoot;
     private String currentParentLabel;
@@ -109,13 +110,13 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
         }
         tabs.addSelectedChangeListener(event -> {
             if (event.isFromClient()) {
-                var entry = tabEntries.get(event.getSelectedTab());
-                if (entry != null) {
-                    if (!autoselect && hasDeeperEntries(entry)) {
-                        rebuildForPath(RouteNavUtils.normalizedPath(entry));
+                var target = tabTargets.get(event.getSelectedTab());
+                if (target != null) {
+                    if (!autoselect && target.group()) {
+                        rebuildForPath(RouteNavUtils.normalizedPath(target.entry()));
                     }
                     else {
-                        UI.getCurrent().navigate(entry.menuClass());
+                        UI.getCurrent().navigate(target.entry().menuClass());
                     }
                 }
             }
@@ -227,9 +228,12 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
                 .flatMap(e -> navGrouper.nodeFor(e).parent().map(n -> n.title()))
                 .orElse(RouteNavUtils.routeSegmentLabel(segs.get(1)));
 
-        var canonical = new LinkedHashMap<String, MenuEntry>();
+        // Unlike buildCanonicalBySegment's own canonical map, siblings here are always exact
+        // depth-3 matches (never a stand-in representing a deeper group), so hasDeeperEntries
+        // checking each entry's own path directly is correct as-is.
+        var canonical = new LinkedHashMap<String, Canonical>();
         for (var e : siblings) {
-            canonical.put(RouteNavUtils.leafTitle(e), e);
+            canonical.put(RouteNavUtils.leafTitle(e), new Canonical(e, hasDeeperEntries(e)));
         }
 
         var activeLabel = RouteNavUtils.leafTitle(
@@ -259,13 +263,13 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
         }
     }
 
-    private void rebuildTabs(LinkedHashMap<String, MenuEntry> canonical, String activeLabel) {
+    private void rebuildTabs(LinkedHashMap<String, Canonical> canonical, String activeLabel) {
         tabs.removeAll();
-        tabEntries.clear();
+        tabTargets.clear();
         Tab activeTab = null;
         for (var entry : canonical.entrySet()) {
             var tab = new Tab(entry.getKey());
-            tabEntries.put(tab, entry.getValue());
+            tabTargets.put(tab, entry.getValue());
             tabs.add(tab);
             if (entry.getKey().equals(activeLabel)) {
                 activeTab = tab;
@@ -275,16 +279,23 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
     }
 
     /**
-     * Groups entries under {@code routeRoot} by the label derived from their second
-     * route segment. Filtering and depth detection use the {@code @Route} template.
+     * Groups entries under {@code routeRoot} by the label derived from their second route
+     * segment, picking one representative {@link MenuEntry} per label (a genuine depth-2 entry
+     * if one exists, otherwise the first depth-3+ entry found) — but {@code group} reflects
+     * whether *any* entry under that label goes deeper than depth 2, independent of which entry
+     * ends up representing it. A label with no depth-2 route of its own (a pure group) always
+     * has its representative picked from among its own depth-3+ children — checking that single
+     * representative's own path for even-deeper nesting (as {@link #hasDeeperEntries} does) would
+     * miss exactly this case, since the representative is one level deeper than the label itself
+     * already. Filtering and depth detection use the {@code @Route} template.
      */
-    private LinkedHashMap<String, MenuEntry> buildCanonicalBySegment(List<MenuEntry> entries, String routeRoot) {
+    private LinkedHashMap<String, Canonical> buildCanonicalBySegment(List<MenuEntry> entries, String routeRoot) {
         var allSub = entries.stream()
                 .filter(e -> RouteNavUtils.normalizedPath(e).startsWith(routeRoot + "/"))
                 .sorted(Comparator.comparingDouble(e -> e.order() != null ? e.order() : Double.MAX_VALUE))
                 .toList();
 
-        var result = new LinkedHashMap<String, MenuEntry>();
+        var byLabel = new LinkedHashMap<String, List<MenuEntry>>();
         for (var e : allSub) {
             var eSegs = RouteNavUtils.pathSegments(e.path());
             var node = navGrouper.nodeFor(e);
@@ -292,26 +303,35 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
                     ? node.title()
                     : node.parent().map(n -> n.title())
                             .orElse(RouteNavUtils.routeSegmentLabel(eSegs.get(1)));
-            var isDepthTwo = eSegs.size() == 2;
-            if (isDepthTwo) {
-                result.put(label, e);
-            }
-            else {
-                result.putIfAbsent(label, e);
-            }
+            byLabel.computeIfAbsent(label, unused -> new ArrayList<>()).add(e);
         }
+
+        var result = new LinkedHashMap<String, Canonical>();
+        byLabel.forEach((label, es) -> {
+            var direct = es.stream()
+                    .filter(e -> RouteNavUtils.pathSegments(e.path()).size() == 2)
+                    .findFirst();
+            var group = es.stream().anyMatch(e -> RouteNavUtils.pathSegments(e.path()).size() > 2);
+            result.put(label, new Canonical(direct.orElseGet(es::getFirst), group));
+        });
         return result;
     }
 
     /** True if any menu entry's normalized path starts with {@code entry}'s own path + "/" —
      *  i.e., selecting this entry's tab would otherwise have shown more beneath it, regardless
-     *  of whether the entry is itself also directly routable. Only consulted when
-     *  {@code !autoselect}. */
+     *  of whether the entry is itself also directly routable. Only meaningful for an entry that
+     *  is itself already the deepest level being shown (see {@link #buildCanonicalBySegment}'s
+     *  own comment for why it doesn't use this directly). Only consulted when {@code
+     *  !autoselect}. */
     private static boolean hasDeeperEntries(MenuEntry entry) {
         var prefix = RouteNavUtils.normalizedPath(entry) + "/";
         return MenuConfiguration.getMenuEntries().stream()
                 .anyMatch(e -> RouteNavUtils.normalizedPath(e).startsWith(prefix));
     }
+
+    /** A canonical tab's target entry, and whether it represents a group (has entries nested
+     *  deeper than the level this tab itself is shown at) rather than a genuine leaf. */
+    private record Canonical(MenuEntry entry, boolean group) {}
 
     /**
      * Locally previews {@code rootEntry}'s own root's immediate (depth-2) children, as if it
