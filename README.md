@@ -484,103 +484,103 @@ Without any configuration, this is what the app chrome looks like on desktop, ta
 <tr>
 <td align="center" colspan="2">
 <img src="README/default/desktop.png" width="480"><br>
-<sub><b>Desktop</b> — <code>SIDENAV</code> drawer</sub>
+<sub><b>Desktop</b> — <code>SideNavDrawerNavRenderer</code></sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="40%">
 <img src="README/default/tablet-portrait.png" width="220"><br>
-<sub><b>Tablet, portrait</b> — <code>RAIL</code></sub>
+<sub><b>Tablet, portrait</b> — <code>SideRailNavRenderer</code></sub>
 </td>
 <td align="center">
 <img src="README/default/tablet-landscape.png" width="320"><br>
-<sub><b>Tablet, landscape</b> — <code>RAIL</code></sub>
+<sub><b>Tablet, landscape</b> — <code>SideRailNavRenderer</code></sub>
 </td>
 </tr>
 <tr>
 <td align="center">
 <img src="README/default/phone-portrait.png" width="140"><br>
-<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a popover</sub>
+<sub><b>Phone, portrait</b> — <code>TouchBarNavRenderer</code>, overflowing into a popover</sub>
 </td>
 <td align="center">
 <img src="README/default/phone-landscape.png" width="300"><br>
-<sub><b>Phone, landscape</b> — <code>TOUCH</code> bottom bar, wide enough that nothing overflows</sub>
+<sub><b>Phone, landscape</b> — <code>TouchBarNavRenderer</code>, wide enough that nothing overflows</sub>
 </td>
 </tr>
 </table>
 
 ### Customized
 
-After a small amount of configuration to provide things like group icons and to tweak some of the default labels, this is what the app chrome looks like.
+Nav-tree configuration — group icons, tweaked labels, custom grouping — is set up once and applies uniformly everywhere, regardless of which renderer ends up showing it on a given scenario; there's nothing to configure per renderer. After a small amount of that configuration, this is what the app chrome looks like.
 
 <table>
 <tr>
 <td align="center" colspan="2">
 <img src="README/custom/desktop.png" width="480"><br>
-<sub><b>Desktop</b> — <code>SIDENAV</code> drawer</sub>
+<sub><b>Desktop</b> — <code>SideNavDrawerNavRenderer</code></sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="40%">
 <img src="README/custom/tablet-portrait.png" width="220"><br>
-<sub><b>Tablet, portrait</b> — <code>RAIL</code></sub>
+<sub><b>Tablet, portrait</b> — <code>SideRailNavRenderer</code></sub>
 </td>
 <td align="center">
 <img src="README/custom/tablet-landscape.png" width="320"><br>
-<sub><b>Tablet, landscape</b> — <code>RAIL</code></sub>
+<sub><b>Tablet, landscape</b> — <code>SideRailNavRenderer</code></sub>
 </td>
 </tr>
 <tr>
 <td align="center">
 <img src="README/custom/phone-portrait.png" width="140"><br>
-<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a popover</sub>
+<sub><b>Phone, portrait</b> — <code>TouchBarNavRenderer</code>, overflowing into a popover</sub>
 </td>
 <td align="center">
 <img src="README/custom/phone-landscape.png" width="300"><br>
-<sub><b>Phone, landscape</b> — <code>TOUCH</code> bottom bar, wide enough that nothing overflows</sub>
+<sub><b>Phone, landscape</b> — <code>TouchBarNavRenderer</code>, wide enough that nothing overflows</sub>
 </td>
 </tr>
 </table>
 
 ### Alternatives
 
-But you aren't stuck with the default renderers. There are some alternative renderers that can be used in place of the default ones, or you can roll your own — see [Built-in alternatives for the phone touch bar](#built-in-alternatives-for-the-phone-touch-bar) for how to register the two shown below.
+But you aren't stuck with the default renderers. There are some alternative renderers that can be used in place of the default ones, or you can roll your own. Each is shown below on whichever scenario it happened to be captured on, but that's incidental — none of these are tied to a particular device or orientation; any renderer can be registered for any scenario. See [Built-in alternatives for the phone touch bar](#built-in-alternatives-for-the-phone-touch-bar), [Built-in alternative for the tablet rail](#built-in-alternative-for-the-tablet-rail), and [Built-in alternative: header tab strip](#built-in-alternative-header-tab-strip) for how to register each one.
 
 <table>
 <tr>
 <td align="center" colspan="2">
 <img src="README/alternative/desktop-header.png" width="480"><br>
-<sub><b>Desktop</b> — <code>SIDENAV</code> drawer</sub>
+<sub><code>HeaderTabsNavRenderer</code> — root sections as a tab strip spanning the header; selecting "Catalog" reveals its own children in the drill-down row beneath</sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="40%">
 <img src="README/alternative/tablet-portrait-flyout-rail.png" width="220"><br>
-<sub><b>Tablet, portrait</b> — <code>RAIL</code></sub>
+<sub><code>FlyoutRailNavRenderer</code> — tapping a rail item's chevron opens a flyout listing its children</sub>
 </td>
 <td align="center">
 <img src="README/alternative/tablet-landscape-flyout-rail.png" width="320"><br>
-<sub><b>Tablet, landscape</b> — <code>RAIL</code></sub>
+<sub><code>FlyoutRailNavRenderer</code> — a child that's itself a group ("Users & Groups") gets the same chevron-and-flyout treatment, recursively</sub>
 </td>
 </tr>
 <tr>
 <td align="center">
 <img src="README/alternative/phone-portrait-unscrolled.png" width="140"><br>
-<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a side-to-side scroller (unscrolled)</sub>
+<sub><code>ScrollingTouchNavRenderer</code> — every root section gets its own item in a horizontally scrollable bar (unscrolled)</sub>
 </td>
 <td align="center">
 <img src="README/alternative/phone-portrait-scrolled.png" width="140"><br>
-<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into a side-to-side scroller (scrolled)</sub>
+<sub><code>ScrollingTouchNavRenderer</code> — scrolled to reveal sections past the fold</sub>
 </td>
 </tr>
 <tr>
 <td align="center">
 <img src="README/alternative/phone-portrait-collapsed.png" width="140"><br>
-<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into an expander (collapsed)</sub>
+<sub><code>ExpandingTouchNavRenderer</code> — a fixed primary row; the rest sit behind a chevron (collapsed)</sub>
 </td>
 <td align="center">
 <img src="README/alternative/phone-portrait-expanded.png" width="140"><br>
-<sub><b>Phone, portrait</b> — <code>TOUCH</code> bottom bar with secondary tabs, overflowing into an expander (expanded)</sub>
+<sub><code>ExpandingTouchNavRenderer</code> — expanded, revealing the rest</sub>
 </td>
 </tr>
 </table>
