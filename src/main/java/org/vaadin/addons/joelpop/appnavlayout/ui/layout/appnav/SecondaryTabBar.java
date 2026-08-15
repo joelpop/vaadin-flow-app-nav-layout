@@ -9,12 +9,13 @@ import com.vaadin.flow.component.Composite;
 import com.vaadin.flow.component.HasComponents;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
+import com.vaadin.flow.component.tabs.TabsVariant;
 import com.vaadin.flow.dom.Element;
 import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
@@ -41,9 +42,11 @@ import java.util.Map;
  * own {@code ComponentEvent}/{@code fireEvent} machinery directly, the same idiom
  * {@code AppNavLayout.addNavTypeChangedListener} already uses elsewhere in this add-on.
  */
+@CssImport("./secondary-tab-bar.css")
 class SecondaryTabBar extends Composite<HorizontalLayout> {
 
     private final boolean autoselect;
+    private final boolean centered;
 
     private NavGrouper navGrouper;
 
@@ -60,12 +63,6 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
     private String currentParentLabel;
     private Class<? extends Component> currentParentRoute;
 
-    /** Selecting a tab navigates immediately — the behavior every existing touch/rail renderer
-     *  relies on. */
-    SecondaryTabBar() {
-        this(true);
-    }
-
     /**
      * @param autoselect {@code true} (Vaadin's own {@code Tabs.setAutoselect} vocabulary, read
      *                    the same direction): selecting a tab acts on it immediately. {@code
@@ -73,9 +70,15 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
      *                    previews them locally ({@link #rebuildForPath}, never {@code
      *                    UI.navigate()}) — used by {@link HeaderTabsNavRenderer}, where a group
      *                    tab should only expand, never auto-navigate.
+     * @param centered centers the tabs within the row's own remaining space, after the Back
+     *                  button — left {@code false} only for a row narrow enough that its tabs
+     *                  already read as filling it (e.g. {@link SideRailNavRenderer}'s own
+     *                  rail-adjacent header row). Independent of {@code autoselect} — neither
+     *                  implies the other; each caller sets both according to its own needs.
      */
-    SecondaryTabBar(boolean autoselect) {
+    SecondaryTabBar(boolean autoselect, boolean centered) {
         this.autoselect = autoselect;
+        this.centered = centered;
 
         // Rarely a good reason to override Composite's own initContent() — HorizontalLayout has
         // a no-arg constructor, so the default (reflection-based) initContent() already builds
@@ -88,13 +91,22 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
         headerNavBar.setSpacing(false);
         headerNavBar.addClassName("secondary-tab-bar");
 
+        // Transparent background/no border, and symmetric (rather than the button's own default
+        // horizontal-only) padding, come from secondary-tab-bar-back's own CSS (secondary-tab-
+        // bar.css), rendering correctly under any theme, or none at all.
         backButton = new Button(VaadinIcon.ARROW_LEFT.create());
-        backButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ICON);
+        backButton.addClassName("secondary-tab-bar-back");
         backButton.setVisible(false);
         backButton.addClickListener(unused -> handleBack());
 
         tabs = new Tabs();
-        tabs.setWidthFull();
+        tabs.addThemeVariants(TabsVariant.SMALL);
+        if (centered) {
+            // Centers the tabs within the row's own remaining space, after the Back button, via
+            // secondary-tab-bar-tabs's own CSS (secondary-tab-bar.css) — the Back button stays
+            // anchored at the row's own start rather than being pulled into the centered group.
+            tabs.addClassName("secondary-tab-bar-tabs");
+        }
         tabs.addSelectedChangeListener(event -> {
             if (event.isFromClient()) {
                 var entry = tabEntries.get(event.getSelectedTab());

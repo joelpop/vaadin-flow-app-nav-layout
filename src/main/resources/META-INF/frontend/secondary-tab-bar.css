@@ -1,0 +1,24 @@
+/* Plain, borderless, transparent background — this add-on's own CSS, rendering correctly under
+   any theme, or none at all. Padding is symmetric (the button's own default is horizontal-only,
+   sized for a text label), so this icon-only button reads as a compact, roughly square target. */
+.secondary-tab-bar-back {
+    background: transparent;
+    border: none;
+    padding: var(--vaadin-padding-s);
+}
+
+/* Centers the tabs within the row's own remaining space, after the Back button, without
+   breaking Tabs' own built-in overflow-scroll behavior. width:fit-content sizes this box to its
+   own content when that content fits; margin-inline:auto then centers that (smaller-than-row)
+   box in the remaining space, leaving the Back button's own position, at the row's start,
+   untouched. max-width:100% is what preserves the overflow behavior: without it, fit-content
+   would let this box grow past the row entirely (min-width:auto's own flex-item default doesn't
+   cap it), so Tabs would never perceive itself as constrained and would silently overflow
+   instead of activating its own scroll affordance — capping at 100% gives it a real, definite
+   width to measure its own content against once that content doesn't fit, which is exactly what
+   its internal overflow detection needs. */
+.secondary-tab-bar-tabs {
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+}

@@ -8,7 +8,6 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasComponents;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -66,10 +65,14 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     // NavStrategy build/tearDown cycle.
     private HasComponents attachedPrimarySlot;
 
-    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar();
+    private final SecondaryTabBar secondaryTabBar;
 
     AbstractTouchNavRenderer(FlexLayout.FlexDirection direction) {
         this.direction = direction;
+        // Centered for the touch bar (TouchBarNavRenderer, direction == ROW), whose row spans a
+        // full phone width; left as SideRailNavRenderer's own natural width otherwise (direction
+        // == COLUMN) — its rail-adjacent header row isn't as wide.
+        secondaryTabBar = new SecondaryTabBar(true, direction == FlexLayout.FlexDirection.ROW);
     }
 
     // Package-private: only AppNavLayout (same package) can call this — a subclass in another
@@ -226,27 +229,22 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     }
 
     /**
-     * Builds a nav-bar item {@link Button} wrapping {@code content}, themed so an {@code .active}
-     * item (this add-on's own CSS, keyed off that class) picks up whichever theme is actually
-     * loaded's own accent color, and navigating to {@code viewClass} on click (or doing nothing
-     * on click if {@code null} — the "More" overflow trigger has no route of its own).
+     * Builds a nav-bar item {@link Button} wrapping {@code content}, and navigating to
+     * {@code viewClass} on click (or doing nothing on click if {@code null} — the "More"
+     * overflow trigger has no route of its own).
      *
-     * <p>theme="tertiary" is a cross-theme-consistent variant name, not a Lumo-only mechanism
-     * despite {@link ButtonVariant#LUMO_TERTIARY}'s legacy "LUMO_" naming — Aura's own button.css
-     * keys off the identical theme="tertiary" attribute, and the un-themed base package supplies
-     * its own sensible default too. This is what lets an {@code .active} item pick up the active
-     * theme's own accent color (Lumo blue, Aura's accent, neutral under base) automatically,
-     * matching {@code vaadin-side-nav-item}'s own selected-item color — the inactive state is
-     * forced back to the neutral secondary color in CSS (app-nav-layout.ts).
+     * <p>Plain, borderless, transparent-background chrome comes from this add-on's own CSS
+     * (app-nav-layout.ts, keyed off the "overflow-nav-item" class a caller adds afterward),
+     * rendering correctly under any theme, or none at all. An {@code .active} item is left at
+     * the button's own plain default text color; the inactive state is forced to the muted
+     * secondary color in that same CSS.
      *
      * <p>Exposed (not just used internally by {@link NavItem}) so a {@link #createOverflowComponent}
-     * override that still wants per-entry buttons doesn't have to reimplement this theming/wiring
-     * by hand — reuse this rather than constructing a {@code Button} directly, or the item risks
-     * silently losing the theme-adaptive color this method exists to guarantee.
+     * override that still wants per-entry buttons doesn't have to reimplement this wiring by
+     * hand — reuse this rather than constructing a {@code Button} directly.
      */
     protected Button createNavButton(Component content, Class<? extends Component> viewClass) {
         var item = new Button(content);
-        item.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         if (viewClass != null) {
             item.addClickListener(unused -> UI.getCurrent().navigate(viewClass));
         }

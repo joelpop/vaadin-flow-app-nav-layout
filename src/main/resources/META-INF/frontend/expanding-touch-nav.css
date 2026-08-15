@@ -96,12 +96,15 @@ vaadin-button.expanding-touch-nav-chevron {
        why that alone isn't relied on for this. This element's width and height are both already
        pinned to the same 44px value via the rule above, so there's nothing for a circle() radius
        calculation to get wrong deriving one from the other. padding:0 keeps the icon centered
-       within this button's own box — Lumo's tertiary/icon padding is horizontal-only, sized for
-       a text button. */
+       within this button's own box, overriding the button's own default padding (sized for a
+       text label, not an icon-only button). background/border are reset to transparent/none, so
+       expanding-touch-nav-chevron-circle's own background/border (above) show through instead. */
     width: 100%;
     height: 100%;
     clip-path: circle(50%);
     padding: 0;
+    background: transparent;
+    border: none;
 }
 
 .expanding-touch-nav-overflow {

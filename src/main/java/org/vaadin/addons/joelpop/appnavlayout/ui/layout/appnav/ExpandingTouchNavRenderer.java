@@ -3,7 +3,6 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasComponents;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.icon.Icon;
@@ -43,7 +42,8 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
     private final Map<NavNode, NavItem> primaryItems = new LinkedHashMap<>();
     private final Map<NavNode, NavItem> overflowItems = new LinkedHashMap<>();
 
-    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar();
+    // Centered: this bar's own row spans a full phone width.
+    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar(true, true);
 
     @Override
     public NavType navType() {
@@ -171,7 +171,8 @@ public class ExpandingTouchNavRenderer implements NavRenderer {
         chevronIcon = VaadinIcon.CHEVRON_UP.create();
 
         var button = new Button(chevronIcon);
-        button.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ICON);
+        // Transparent background/no border come from vaadin-button.expanding-touch-nav-chevron's
+        // own CSS (expanding-touch-nav.css), rendering correctly under any theme, or none at all.
         button.addClassName("expanding-touch-nav-chevron");
         button.addClickListener(e -> setExpanded(!expanded));
 

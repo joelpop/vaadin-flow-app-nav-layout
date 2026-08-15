@@ -4,7 +4,6 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Composite;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -68,7 +67,8 @@ class NavItem extends Composite<Button> {
         row.addClassName("flyout-rail-item-row");
         row.setWidthFull();
 
-        getContent().addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        // Transparent background/no border come from .touch-nav-item's own CSS (app-nav-
+        // layout.ts), which renders correctly under any theme, or none at all.
         getContent().addClassName("touch-nav-item");
         if (viewClass != null) {
             // Attached to the whole Button, not just content — clicking anywhere in the row

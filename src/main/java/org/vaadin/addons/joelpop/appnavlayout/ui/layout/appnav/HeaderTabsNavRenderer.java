@@ -34,8 +34,10 @@ public class HeaderTabsNavRenderer implements NavRenderer {
     private Registration secondaryBlurRegistration;
 
     // Selecting a tab that still has deeper children beneath it only previews them in the
-    // drill-down row below, never navigates on its own.
-    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar(false);
+    // drill-down row below, never navigates on its own; its tabs are centered, since this row
+    // spans a full desktop header width unlike the narrower touch bar/rail row every other
+    // renderer uses this bar in.
+    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar(false, true);
 
     @Override
     public NavType navType() {

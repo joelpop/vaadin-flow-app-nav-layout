@@ -197,8 +197,11 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
         topBar.setPadding(false);
         topBar.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
         // Prevents topBar from being flex-centred inside navbar-top (and jumping vertically)
-        // when viewHeaderSlot is hidden; see the topBarYStableWhen* IT tests.
-        topBar.getStyle().set("min-height", "var(--lumo-size-xl)");
+        // when viewHeaderSlot is hidden; see the topBarYStableWhen* IT tests. A plain literal,
+        // not a theme token: no generic --vaadin-size-* scale exists (control-height sizing
+        // isn't part of the base design-token set), so this is a fixed value rather than a guess
+        // at a theme-specific one, matching a typical toolbar row's own height.
+        topBar.getStyle().set("min-height", "3rem");
         topBar.addClassName("app-top-bar");
         drawerToggle = new DrawerToggle();
         topBar.add(drawerToggle);

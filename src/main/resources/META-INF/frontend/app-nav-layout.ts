@@ -195,10 +195,12 @@ GLOBAL_STYLES.replaceSync(`
         row-gap: var(--vaadin-gap-m);
     }
 
-    /* This is a real vaadin-button (theme="tertiary" — see NavItem's own comment for why), not a
-       bare reset element, so only sizing is overridden here; the button's own tertiary-variant CSS
-       already supplies a transparent background and borderless look. */
+    /* This is a real vaadin-button. Plain CSS properties give it a transparent background and no
+       border, rendering correctly under any theme, or none at all — see this file's own header
+       comment on why this file sticks to generic --vaadin-* tokens throughout. */
     .touch-nav-item {
+        background: transparent;
+        border: none;
         /* Overrides the flex-item default (min-width:auto, which pins the shrink floor to the
            label's un-wrapped width) so an item can shrink below its own natural content width
            and .touch-nav-label's ellipsis can engage instead of forcing the bar/rail wider than
@@ -262,20 +264,20 @@ GLOBAL_STYLES.replaceSync(`
         max-width: 100%;
     }
 
-    /* Active vs. inactive state for touch/rail/overflow nav items. Both are real vaadin-buttons
-       with theme="tertiary" (see NavItem's own comment), whose own CSS
-       already colors the button's text in the active theme's own accent (Lumo blue, Aura's
-       accent, or a neutral default under base) — exactly the behavior the user expects to match
-       vaadin-side-nav-item's own selected-item color. Inactive items override that back down to
-       the muted secondary color; !important is needed to win over the button's own tertiary-
-       variant color rule, which the theme's own stylesheet sets at equal selector specificity. */
+    /* Active vs. inactive state for touch/rail/overflow nav items: inactive items are muted to
+       the secondary text color; active items are left at the button's own plain default
+       (full-strength) text color. !important wins over the button's own default color rule, set
+       at equal selector specificity. */
     .touch-nav-item:not(.active),
     .overflow-nav-item:not(.active) {
         color: var(--vaadin-text-color-secondary) !important;
     }
 
-    /* Overflow popover buttons: full-width, left-aligned (Button's own default centers content). */
+    /* Overflow popover buttons: full-width, left-aligned (Button's own default centers content).
+       background/border reset the same way .touch-nav-item does above, for the same reason. */
     .overflow-nav-item {
+        background: transparent;
+        border: none;
         justify-content: flex-start;
         padding-inline: var(--vaadin-padding-m);
         padding-block: var(--vaadin-padding-m);
@@ -289,19 +291,19 @@ GLOBAL_STYLES.replaceSync(`
         gap: var(--vaadin-gap-m);
     }
 
-    /* !important needed to win over the button's own tertiary-variant background rule (transparent),
-       set by the theme's own stylesheet at equal selector specificity — same fight as the active/
-       inactive color rule above. */
+    /* :hover's own extra pseudo-class gives this higher specificity than .overflow-nav-item's
+       own plain background rule above, in the same stylesheet, settling the cascade outright. */
     .overflow-nav-item:hover {
-        background: var(--vaadin-background-container) !important;
+        background: var(--vaadin-background-container);
     }
 
     /* :active (not just :hover) gives touch input real tap feedback — on a touchscreen,
        :hover can stick after a tap instead of clearing, or never engage at all, since these
        items exist specifically for touch/rail nav. "Strong" variant so it's visibly a step up
-       from the :hover background above, not just a repeat of it. */
+       from the :hover background above, not just a repeat of it. Same specificity as :hover
+       above; declaration order (this rule comes after) settles the tie when both apply at once. */
     .overflow-nav-item:active {
-        background: var(--vaadin-background-container-strong) !important;
+        background: var(--vaadin-background-container-strong);
     }
 
     /* Desktop-only view header bottom border — toggled on/off by DesktopNavStrategy's own

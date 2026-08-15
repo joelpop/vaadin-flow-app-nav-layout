@@ -3,7 +3,6 @@ package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasComponents;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.html.Div;
@@ -45,7 +44,8 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
     private Button leftChevron;
     private Button rightChevron;
 
-    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar();
+    // Centered: this bar's own row spans a full phone width.
+    private final SecondaryTabBar secondaryTabBar = new SecondaryTabBar(true, true);
 
     @Override
     public NavType navType() {
@@ -138,7 +138,6 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         var leftContent = new Div(leftIcon, leftLabelPlaceholder);
         leftContent.addClassName("touch-nav-content");
         leftChevron = new Button(leftContent);
-        leftChevron.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         leftChevron.addClassName("scrolling-touch-nav-chevron-left");
         leftChevron.getElement().getStyle().set("cursor", "pointer");
 
@@ -150,7 +149,6 @@ public class ScrollingTouchNavRenderer implements NavRenderer {
         var rightContent = new Div(rightIcon, rightLabelPlaceholder);
         rightContent.addClassName("touch-nav-content");
         rightChevron = new Button(rightContent);
-        rightChevron.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         rightChevron.addClassName("scrolling-touch-nav-chevron-right");
         rightChevron.getElement().getStyle().set("cursor", "pointer");
 
