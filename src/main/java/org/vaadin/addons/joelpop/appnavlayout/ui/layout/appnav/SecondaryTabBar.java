@@ -1,7 +1,6 @@
 package org.vaadin.addons.joelpop.appnavlayout.ui.layout.appnav;
 
-import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavGrouper;
-import org.vaadin.addons.joelpop.appnavlayout.ui.nav.RouteNavUtils;
+import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavNode;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentEvent;
 import com.vaadin.flow.component.ComponentEventListener;
@@ -17,21 +16,21 @@ import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.component.tabs.TabsVariant;
 import com.vaadin.flow.dom.Element;
-import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.shared.Registration;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * The two-level drill-down bar built into {@link NavSlots#headerNav()}: depth-2 routes show flat
- * sibling tabs, depth-3+ routes show a {@code [← Back]} button plus the siblings under the same
- * two-segment parent prefix. Any {@link NavRenderer} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#TOUCH},
+ * The recursive drill-down bar built into {@link NavSlots#headerNav()}: shows one {@link Tab}
+ * per direct child of whichever {@link NavNode} group is currently in view — on a real
+ * navigation, the active leaf's own immediate parent group; while exploring, whichever group was
+ * last selected without navigating — with a {@code [← Back]} button that climbs exactly one
+ * level at a time, all the way up to a root's own direct children, however deep the actual nav
+ * tree goes. Any {@link NavRenderer} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#TOUCH},
  * {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#RAIL}, or
  * {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#HEADER} that wants this behavior
  * holds one instance and calls {@link #render} from within its own {@code render}.
@@ -49,7 +48,9 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
     private final boolean autoselect;
     private final boolean centered;
 
-    private NavGrouper navGrouper;
+    private NavRenderContext context;
+    private Map<NavNode, List<NavNode>> childrenIndex = Map.of();
+    private Set<NavNode> activeChain = Set.of();
 
     // Slot component this bar last attached into — used to detect a NavStrategy tear-down/rebuild
     // (fresh slot instances), since this bar outlives any single NavStrategy build/tearDown cycle.
@@ -58,19 +59,22 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
     private final HorizontalLayout headerNavBar;
     private final Button backButton;
     private final Tabs tabs;
-    private final Map<Tab, Canonical> tabTargets = new HashMap<>();
-    private String currentPath;
-    private String currentRoot;
-    private String currentParentLabel;
-    private Class<? extends Component> currentParentRoute;
+    private final Map<Tab, NavNode> tabTargets = new HashMap<>();
+
+    // The group whose direct children are currently shown as tabs; null hides this bar entirely.
+    private NavNode currentGroup;
+    // true: currentGroup was reached by exploring (a preview — nothing is ever marked active).
+    // false: currentGroup is the real active leaf's own ancestor chain (restore()-computed).
+    private boolean exploring;
 
     /**
      * @param autoselect {@code true} (Vaadin's own {@code Tabs.setAutoselect} vocabulary, read
-     *                    the same direction): selecting a tab acts on it immediately. {@code
-     *                    false}: selecting a tab that still has deeper children beneath it only
-     *                    previews them locally ({@link #rebuildForPath}, never {@code
-     *                    UI.navigate()}) — used by {@link HeaderTabsNavRenderer}, where a group
-     *                    tab should only expand, never auto-navigate.
+     *                    the same direction): selecting a tab acts on it immediately, including a
+     *                    group tab — which navigates to its own first navigable descendant.
+     *                    {@code false}: selecting a group tab only previews its own children
+     *                    locally ({@link #explore}, never {@code UI.navigate()}) — used by
+     *                    {@link HeaderTabsNavRenderer}, where a group tab should only expand,
+     *                    never auto-navigate.
      * @param centered centers the tabs within the row's own remaining space, after the Back
      *                  button — left {@code false} only for a row narrow enough that its tabs
      *                  already read as filling it (e.g. {@link SideRailNavRenderer}'s own
@@ -102,6 +106,13 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
 
         tabs = new Tabs();
         tabs.addThemeVariants(TabsVariant.SMALL);
+        if (!autoselect) {
+            // Vaadin's own Tabs auto-selects the first tab added to an empty instance by
+            // default — rebuildTabs' own removeAll()+add() loop below would otherwise trigger
+            // that regardless of the active tab it computes, since it happens independently of
+            // (and before) the explicit setSelectedTab call that follows it.
+            tabs.setAutoselect(false);
+        }
         if (centered) {
             // Centers the tabs within the row's own remaining space, after the Back button, via
             // secondary-tab-bar-tabs's own CSS (secondary-tab-bar.css) — the Back button stays
@@ -112,11 +123,19 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
             if (event.isFromClient()) {
                 var target = tabTargets.get(event.getSelectedTab());
                 if (target != null) {
-                    if (!autoselect && target.group()) {
-                        rebuildForPath(RouteNavUtils.normalizedPath(target.entry()));
+                    if (!autoselect && childrenIndex.containsKey(target)) {
+                        showGroup(target, true);
+                        // Rebuilding this bar's own tabs (above) just removed the very tab the
+                        // user clicked to get here, which native-blurs it to nothing — the
+                        // debounced "focusout" listener below reads that as focus having left
+                        // this bar entirely unless something within it reclaims focus first.
+                        refocusAfterOwnRebuild();
                     }
                     else {
-                        UI.getCurrent().navigate(target.entry().menuClass());
+                        var leafClass = target.menuEntry()
+                                .<Class<? extends Component>>map(MenuEntry::menuClass)
+                                .orElseGet(() -> RootNavSupport.firstChildOf(target, context));
+                        UI.getCurrent().navigate(leafClass);
                     }
                 }
             }
@@ -125,233 +144,140 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
         headerNavBar.add(backButton, tabs);
 
         if (!autoselect) {
-            // "focusout" (unlike the native "blur" event BlurEvent below is named after) bubbles,
-            // so this one listener catches focus leaving any descendant tab, not just this
-            // element itself.
-            getElement().addEventListener("focusout", event -> fireEvent(new BlurEvent(this,
-                    event.getEventDataElement("event.relatedTarget").orElse(null))))
-                    .addEventDataElement("event.relatedTarget");
+            // Removing a focused tab from the DOM (rebuildTabs' own removeAll(), on every
+            // explore/back step) blurs it immediately, with relatedTarget always null —
+            // indistinguishable, at this instant, from focus genuinely leaving this bar for
+            // good. Waiting a frame lets a same-step refocus (see #refocusAfterOwnRebuild) land
+            // first, so only a focusout still unresolved a frame later is treated as the real
+            // thing, and reads the actual landing spot fresh off document.activeElement rather
+            // than the original event's own (by-then-stale) relatedTarget.
+            getElement().executeJs("""
+                    const bar = this;
+                    bar.addEventListener('focusout', () => {
+                        requestAnimationFrame(() => {
+                            if (!bar.contains(document.activeElement)) {
+                                bar.dispatchEvent(new CustomEvent('nav-blur'));
+                            }
+                        });
+                    });
+                    """);
+            getElement().addEventListener("nav-blur", event -> fireEvent(new BlurEvent(this,
+                    event.getEventDataElement("document.activeElement").orElse(null))))
+                    .addEventDataElement("document.activeElement");
         }
     }
 
     void render(NavRenderContext context) {
-        this.navGrouper = context.navGrouper();
-        this.currentPath = context.currentPath();
+        this.context = context;
         var headerNav = context.slots().headerNav();
         if (attachedSlot != headerNav) {
             headerNav.add(this);
             attachedSlot = headerNav;
         }
-        rebuildForPath(currentPath);
+        restore();
+    }
+
+    /** Restores this bar to reflect the actually-active route, discarding whatever was being
+     *  explored via {@link #explore} or a local drill-down. The level shown is the active
+     *  leaf's own immediate parent group — its direct siblings — regardless of how deep that
+     *  is; {@link #handleBack} climbs one level at a time from there. */
+    void restore() {
+        childrenIndex = RootNavSupport.childrenOf(context);
+        activeChain = RootNavSupport.activeChainFor(context);
+        var activeRoot = RootNavSupport.activeRootFor(context);
+        if (activeRoot == null) {
+            hide();
+            return;
+        }
+        // activeChain is ordered leaf-first, so the first entry that owns children (a leaf
+        // never does — see PathPrefixNavGrouper's own class comment) is the active leaf's own
+        // immediate parent; a root-level leaf with no group of its own falls through to
+        // activeRoot itself, which showGroup then hides for (having no children either).
+        var group = activeChain.stream()
+                .filter(childrenIndex::containsKey)
+                .findFirst()
+                .orElse(activeRoot);
+        showGroup(group, false);
     }
 
     /**
-     * Rebuilds the drill-down bar from scratch based on the route depth of {@code path}.
-     * Depth-2 routes show level-1 sibling tabs; depth-3+ routes show
-     * [← Back] + the depth-3 siblings under the same two-segment parent prefix.
+     * Locally previews {@code node}'s own direct children, as if navigated to, but never marks
+     * any of them active — nothing has actually been chosen yet, only revealed. Used whenever a
+     * group tab is selected elsewhere (a root tab in {@link HeaderTabsNavRenderer}'s own strip,
+     * or one of this bar's own group tabs) without committing to a leaf.
      */
-    private void rebuildForPath(String path) {
-        var entries = MenuConfiguration.getMenuEntries();
-
-        var currentEntry = entries.stream()
-                .filter(e -> path.equals(RouteNavUtils.normalizedPath(e)))
-                .findFirst().orElse(null);
-
-        if (currentEntry == null) {
-            headerNavBar.setVisible(false);
-            return;
-        }
-
-        var segs = RouteNavUtils.pathSegments(path);
-
-        if (segs.size() < 2) {
-            headerNavBar.setVisible(false);
-            return;
-        }
-
-        currentRoot = segs.getFirst();
-
-        if (segs.size() == 2) {
-            buildLevel1(entries, currentRoot, navGrouper.nodeFor(currentEntry).title());
-        }
-        else {
-            buildLevel2(entries, segs, path);
-        }
+    void explore(NavNode node) {
+        showGroup(node, true);
     }
 
-    private void buildLevel1(List<MenuEntry> entries, String routeRoot, String activeLabel) {
-        var canonical = buildCanonicalBySegment(entries, routeRoot);
-        if (canonical.isEmpty()) {
-            headerNavBar.setVisible(false);
+    /**
+     * Shows {@code group}'s own direct children as tabs. {@code exploring} decides whether any
+     * of them get marked active: {@code false} consults {@link #activeChain} (the real current
+     * route), {@code true} never marks anything (a preview). Hides this bar entirely if
+     * {@code group} turns out to have no children of its own — either a plain leaf with no
+     * group at all, or (defensively) a group {@link NavNode} nothing was ever registered under.
+     */
+    private void showGroup(NavNode group, boolean exploring) {
+        var children = childrenIndex.get(group);
+        if (children == null || children.isEmpty()) {
+            hide();
             return;
         }
-
-        backButton.setVisible(false);
-        currentParentLabel = null;
-        currentParentRoute = null;
-
-        rebuildTabs(canonical, activeLabel);
+        currentGroup = group;
+        this.exploring = exploring;
+        backButton.setVisible(group.parent().isPresent());
+        rebuildTabs(children, !exploring);
         headerNavBar.setVisible(true);
     }
 
-    private void buildLevel2(List<MenuEntry> entries, List<String> segs, String activePath) {
-        var routeParentPrefix = segs.getFirst() + "/" + segs.get(1);
-
-        currentParentRoute = entries.stream()
-                .filter(e -> RouteNavUtils.normalizedPath(e).equals(routeParentPrefix))
-                .findFirst()
-                .map(MenuEntry::menuClass)
-                .orElse(null);
-
-        var siblings = entries.stream()
-                .filter(e -> RouteNavUtils.normalizedPath(e).startsWith(routeParentPrefix + "/")
-                        && RouteNavUtils.pathSegments(e.path()).size() == 3)
-                .sorted(Comparator.comparingDouble(e -> e.order() != null ? e.order() : Double.MAX_VALUE))
-                .toList();
-
-        if (siblings.isEmpty()) {
-            // Derive the active label the same way buildCanonicalBySegment would:
-            // use the navGrouper title for the entry at routeParentPrefix if one exists,
-            // otherwise humanise the second path segment.
-            var fallbackLabel = entries.stream()
-                    .filter(e -> routeParentPrefix.equals(RouteNavUtils.normalizedPath(e)))
-                    .findFirst()
-                    .map(e -> navGrouper.nodeFor(e).title())
-                    .orElseGet(() -> RouteNavUtils.routeSegmentLabel(segs.get(1)));
-            buildLevel1(entries, segs.getFirst(), fallbackLabel);
-            return;
-        }
-
-        currentParentLabel = entries.stream()
-                .filter(e -> activePath.equals(RouteNavUtils.normalizedPath(e)))
-                .findFirst()
-                .flatMap(e -> navGrouper.nodeFor(e).parent().map(n -> n.title()))
-                .orElse(RouteNavUtils.routeSegmentLabel(segs.get(1)));
-
-        // Unlike buildCanonicalBySegment's own canonical map, siblings here are always exact
-        // depth-3 matches (never a stand-in representing a deeper group), so hasDeeperEntries
-        // checking each entry's own path directly is correct as-is.
-        var canonical = new LinkedHashMap<String, Canonical>();
-        for (var e : siblings) {
-            canonical.put(RouteNavUtils.leafTitle(e), new Canonical(e, hasDeeperEntries(e)));
-        }
-
-        var activeLabel = RouteNavUtils.leafTitle(
-                siblings.stream().filter(e -> activePath.equals(RouteNavUtils.normalizedPath(e)))
-                        .findFirst().orElse(siblings.getFirst()));
-
-        backButton.setVisible(true);
-        rebuildTabs(canonical, activeLabel);
-        headerNavBar.setVisible(true);
+    private void hide() {
+        currentGroup = null;
+        exploring = false;
+        headerNavBar.setVisible(false);
     }
 
     private void handleBack() {
-        // currentRoot/currentParentRoute are only null until segs.size() >= 2 first populates
-        // them in buildLevel2(); handleBack() is only reachable via the back button, which is
-        // only visible in that same level-2 state, so both are guaranteed non-null here (except
-        // the !autoselect branch below, which never reads currentParentRoute at all).
-        if (!autoselect) {
-            // Collapsing back a level is the mirror of expanding into one — stays local, never
-            // navigates, the same non-committal rule the Tabs selection listener above applies.
-            buildLevel1(MenuConfiguration.getMenuEntries(), currentRoot, currentParentLabel);
-        }
-        else if (currentParentRoute != null) {
-            UI.getCurrent().navigate(currentParentRoute);
-        }
-        else {
-            buildLevel1(MenuConfiguration.getMenuEntries(), currentRoot, currentParentLabel);
-        }
+        // backButton is only visible when currentGroup has a parent (see showGroup) — reachable
+        // only in that state, so currentGroup.parent() is guaranteed present here. Preserves
+        // exploring as-is: going back changes which level is shown, not whether what's shown is
+        // a real, committed location or still just a preview.
+        showGroup(currentGroup.parent().orElseThrow(), exploring);
     }
 
-    private void rebuildTabs(LinkedHashMap<String, Canonical> canonical, String activeLabel) {
+    private void rebuildTabs(List<NavNode> children, boolean markActive) {
         tabs.removeAll();
         tabTargets.clear();
         Tab activeTab = null;
-        for (var entry : canonical.entrySet()) {
-            var tab = new Tab(entry.getKey());
-            tabTargets.put(tab, entry.getValue());
+        for (var child : children) {
+            var tab = new Tab(child.title());
+            tabTargets.put(tab, child);
             tabs.add(tab);
-            if (entry.getKey().equals(activeLabel)) {
+            if (markActive && activeChain.contains(child)) {
                 activeTab = tab;
             }
         }
         tabs.setSelectedTab(activeTab);
     }
 
-    /**
-     * Groups entries under {@code routeRoot} by the label derived from their second route
-     * segment, picking one representative {@link MenuEntry} per label (a genuine depth-2 entry
-     * if one exists, otherwise the first depth-3+ entry found) — but {@code group} reflects
-     * whether *any* entry under that label goes deeper than depth 2, independent of which entry
-     * ends up representing it. A label with no depth-2 route of its own (a pure group) always
-     * has its representative picked from among its own depth-3+ children — checking that single
-     * representative's own path for even-deeper nesting (as {@link #hasDeeperEntries} does) would
-     * miss exactly this case, since the representative is one level deeper than the label itself
-     * already. Filtering and depth detection use the {@code @Route} template.
-     */
-    private LinkedHashMap<String, Canonical> buildCanonicalBySegment(List<MenuEntry> entries, String routeRoot) {
-        var allSub = entries.stream()
-                .filter(e -> RouteNavUtils.normalizedPath(e).startsWith(routeRoot + "/"))
-                .sorted(Comparator.comparingDouble(e -> e.order() != null ? e.order() : Double.MAX_VALUE))
-                .toList();
-
-        var byLabel = new LinkedHashMap<String, List<MenuEntry>>();
-        for (var e : allSub) {
-            var eSegs = RouteNavUtils.pathSegments(e.path());
-            var node = navGrouper.nodeFor(e);
-            var label = eSegs.size() == 2
-                    ? node.title()
-                    : node.parent().map(n -> n.title())
-                            .orElse(RouteNavUtils.routeSegmentLabel(eSegs.get(1)));
-            byLabel.computeIfAbsent(label, unused -> new ArrayList<>()).add(e);
-        }
-
-        var result = new LinkedHashMap<String, Canonical>();
-        byLabel.forEach((label, es) -> {
-            var direct = es.stream()
-                    .filter(e -> RouteNavUtils.pathSegments(e.path()).size() == 2)
-                    .findFirst();
-            var group = es.stream().anyMatch(e -> RouteNavUtils.pathSegments(e.path()).size() > 2);
-            result.put(label, new Canonical(direct.orElseGet(es::getFirst), group));
-        });
-        return result;
-    }
-
-    /** True if any menu entry's normalized path starts with {@code entry}'s own path + "/" —
-     *  i.e., selecting this entry's tab would otherwise have shown more beneath it, regardless
-     *  of whether the entry is itself also directly routable. Only meaningful for an entry that
-     *  is itself already the deepest level being shown (see {@link #buildCanonicalBySegment}'s
-     *  own comment for why it doesn't use this directly). Only consulted when {@code
-     *  !autoselect}. */
-    private static boolean hasDeeperEntries(MenuEntry entry) {
-        var prefix = RouteNavUtils.normalizedPath(entry) + "/";
-        return MenuConfiguration.getMenuEntries().stream()
-                .anyMatch(e -> RouteNavUtils.normalizedPath(e).startsWith(prefix));
-    }
-
-    /** A canonical tab's target entry, and whether it represents a group (has entries nested
-     *  deeper than the level this tab itself is shown at) rather than a genuine leaf. */
-    private record Canonical(MenuEntry entry, boolean group) {}
-
-    /**
-     * Locally previews {@code rootEntry}'s own root's immediate (depth-2) children, as if it
-     * were the current path, without navigating — for a primary root tab representing a group.
-     * Deliberately not just {@code rebuildForPath(pathOfRootEntry)}: a representative entry
-     * chosen for a root can be arbitrarily deep (e.g. the root's only leaves are three levels
-     * down), and {@code rebuildForPath} would then skip straight to the back-button view instead
-     * of the root's own immediate children. This always shows the flat level-1 view, regardless
-     * of how deep {@code rootEntry} happens to be. Only meaningful when {@code !autoselect}.
-     */
-    void exploreRoot(MenuEntry rootEntry) {
-        currentRoot = RouteNavUtils.pathSegments(RouteNavUtils.normalizedPath(rootEntry)).getFirst();
-        buildLevel1(MenuConfiguration.getMenuEntries(), currentRoot, null);
-    }
-
-    /** Restores this bar to reflect the actually-active route, discarding whatever was being
-     *  explored via {@link #exploreRoot} or a local drill-down. Only meaningful when
-     *  {@code !autoselect}. */
-    void restore() {
-        rebuildForPath(currentPath);
+    /** Keeps focus within this bar's own subtree right after a rebuild that has just replaced
+     *  the very tab the user clicked to trigger it (see the "focusout" listener registered in
+     *  the constructor for why that matters). Vaadin's own Tabs tracks a single focusable tab
+     *  via roving tabindex regardless of which (if any) is selected, so focusing the component
+     *  itself is enough to land on one.
+     *
+     *  <p>Clears {@code focus-ring} on whatever tab that lands on right after: Vaadin's own
+     *  {@code FocusMixin} sets that attribute — the one its theme actually keys the visible
+     *  ring on, not bare {@code :focus} — whenever a keydown has fired anywhere on the page more
+     *  recently than the last mousedown, a page-wide signal with no way to tell it this
+     *  particular focus call is a same-click follow-up rather than real keyboard navigation.
+     *  Clearing it here undoes exactly that misfire without touching a real keyboard-driven
+     *  focus into this bar at any other time. */
+    private void refocusAfterOwnRebuild() {
+        tabs.getElement().executeJs("""
+                const bar = this;
+                bar.focus();
+                requestAnimationFrame(() => bar.querySelector('[focus-ring]')?.removeAttribute('focus-ring'));
+                """);
     }
 
     /** True if {@code candidate} is this bar's own element, or a descendant of it — lets an
@@ -372,9 +298,6 @@ class SecondaryTabBar extends Composite<HorizontalLayout> {
     /**
      * Fired when this bar is blurred (Vaadin's own vocabulary for "lost focus") — carrying
      * whatever element focus moved to, or {@code null} if it left the browser context entirely.
-     * The DOM mechanism underneath is {@code "focusout"}, not the native {@code "blur"} event
-     * this is named after: unlike {@code "blur"}, {@code "focusout"} bubbles, so one listener on
-     * this bar's own element catches it leaving any descendant tab — {@code "blur"} wouldn't.
      * Only fired when constructed with {@code autoselect=false}.
      */
     static class BlurEvent extends ComponentEvent<SecondaryTabBar> {

@@ -20,7 +20,7 @@ import java.util.Objects;
  * {@link Tabs} strip spanning the header; selecting a leaf navigates directly, selecting a group
  * only reveals that root's own children in the shared {@link SecondaryTabBar} drill-down row
  * beneath, never navigating on its own — the same non-committal rule the drill-down row itself
- * applies to a group tab of its own (see {@link SecondaryTabBar#SecondaryTabBar(boolean)}).
+ * applies to a group tab of its own (see {@link SecondaryTabBar#SecondaryTabBar(boolean, boolean)}).
  * Losing focus on the whole nav hierarchy — either row — without ever landing on a leaf restores
  * both to whatever the real current view actually is.
  */
@@ -72,11 +72,10 @@ public class HeaderTabsNavRenderer implements NavRenderer {
                         if (leafClass != null) {
                             UI.getCurrent().navigate(leafClass);
                         }
-                        else if (cachedContext != null) {
+                        else {
                             // No route of its own — a group only reveals its children in the
                             // drill-down row below, it never navigates anywhere on its own.
-                            RootNavSupport.firstChildEntryOf(node, cachedContext)
-                                    .ifPresent(secondaryTabBar::exploreRoot);
+                            secondaryTabBar.explore(node);
                         }
                     }
                 }

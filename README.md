@@ -389,7 +389,7 @@ Public, no-arg constructor, same as the defaults.
 
 #### Built-in alternative: header tab strip
 
-`HeaderTabsNavRenderer` builds no drawer, rail, or bottom bar at all — root sections render as a `Tabs` strip spanning the header, alongside brand and user content. Selecting a leaf navigates directly; selecting a group only reveals that root's own children in the same shared drill-down bar every other touch/rail renderer already uses (here shown as a second row beneath the tab strip instead of beneath a rail or bottom bar) — it never navigates on its own, at either level. Losing focus on the whole nav hierarchy without ever landing on a leaf restores both rows to whatever the real current view actually is. Register it for whichever scenario should use it — a wide desktop viewport is the natural fit, but nothing restricts it to that scenario:
+`HeaderTabsNavRenderer` builds no drawer, rail, or bottom bar at all — root sections render as a `Tabs` strip spanning the header, alongside brand and user content. Selecting a leaf navigates directly; selecting a group only reveals that root's own children in the same shared drill-down bar every other touch/rail renderer already uses (here shown as a second row beneath the tab strip instead of beneath a rail or bottom bar) — it never navigates on its own, at any level. Losing focus on the whole nav hierarchy without ever landing on a leaf restores both rows to whatever the real current view actually is. Register it for whichever scenario should use it — a wide desktop viewport is the natural fit, but nothing restricts it to that scenario:
 
 ```java
 setDesktopNavRenderer(HeaderTabsNavRenderer::new);
@@ -591,7 +591,7 @@ But you aren't stuck with the default renderers. There are some alternative rend
 
 `AppNavLayout` builds one nav tree from your routes, then hands that same tree to a different renderer depending on the device. The tree itself — a graph of `NavNode`s built by whichever `NavGrouper` is configured — has no idea what device it'll be shown on; the two decisions are made independently and only combined at render time. That's what lets a `SideNav` drawer, a touch bottom bar, and a side rail all stay in sync with the same routes without three separate components to maintain.
 
-`AppNavLayout` distinguishes five device/orientation scenarios (desktop, tablet portrait, tablet landscape, phone portrait, phone landscape), each with its own configurable `NavRenderer`. On attach, it reads touch capability and screen size to resolve the current scenario, which determines both the `NavRenderer` and the `NavType` it declares (`SIDENAV`, `RAIL`, `TOUCH`, or `HEADER`) — `SIDENAV` builds a `DesktopNavStrategy` (a full `SideNav` in the drawer), `RAIL`/`TOUCH` build a `TouchNavStrategy` (an icon bar or rail, plus a two-level drill-down header for nested routes), `HEADER` builds a `HeaderNavStrategy` (a tab strip spanning the header, alongside brand/user content, plus the same two-level drill-down beneath it). A `Signal.effect` on the window size re-evaluates this on every rotation or resize, swapping chrome in place with no page reload — though if the newly-resolved scenario still points at the same `NavRenderer` instance as before (tablet's two orientations share one by default), nothing tears down and rebuilds; only the item count/layout inside that renderer adjusts.
+`AppNavLayout` distinguishes five device/orientation scenarios (desktop, tablet portrait, tablet landscape, phone portrait, phone landscape), each with its own configurable `NavRenderer`. On attach, it reads touch capability and screen size to resolve the current scenario, which determines both the `NavRenderer` and the `NavType` it declares (`SIDENAV`, `RAIL`, `TOUCH`, or `HEADER`) — `SIDENAV` builds a `DesktopNavStrategy` (a full `SideNav` in the drawer), `RAIL`/`TOUCH` build a `TouchNavStrategy` (an icon bar or rail, plus a drill-down header for nested routes, however deep they go), `HEADER` builds a `HeaderNavStrategy` (a tab strip spanning the header, alongside brand/user content, plus the same drill-down beneath it). A `Signal.effect` on the window size re-evaluates this on every rotation or resize, swapping chrome in place with no page reload — though if the newly-resolved scenario still points at the same `NavRenderer` instance as before (tablet's two orientations share one by default), nothing tears down and rebuilds; only the item count/layout inside that renderer adjusts.
 
 See [Nav renderers](#nav-renderers) for configuring each of these pieces, and [API Reference](#api-reference) for the full `NavRenderer`/`NavStrategy`/`NavType` picture.
 
@@ -604,7 +604,7 @@ See [Nav renderers](#nav-renderers) for configuring each of these pieces, and [A
 - **Nav tree derived from your routes** — the entire nav tree comes from the `@Route`/`@Menu` metadata your views already declare; add, move, or rename a view and every nav surface (bar, rail, drawer) picks it up with no separate wiring.
 - **Automatic grouping** — sibling routes sharing a first path segment (e.g. `catalog/products`, `catalog/categories`) are grouped under an auto-labeled section with no group annotation of their own.
 - **Overflow handling** — when more root sections exist than fit a touch bar or rail, the excess collapses into a "More" popover automatically.
-- **Drill-down secondary nav** — nested routes get a two-level tab bar with a back button on touch/rail, kept in sync with the current route.
+- **Drill-down secondary nav** — nested routes get a tab bar with a back button that climbs one level at a time, however deep the route hierarchy goes, on touch/rail, kept in sync with the current route.
 - **Active-item highlighting** — the current route's nav item is highlighted consistently across all three nav types.
 - **Adaptive per-view header** — a view can contribute an icon+title (desktop) or an action component (desktop and mobile) to a header slot that reassembles itself on every navigation, via `HasViewHeaderTitle`/`HasViewHeaderComponent`.
 - **Theme-adaptive styling** — active nav items pick up whichever Vaadin theme is actually loaded (Lumo, Aura, or a properly authored custom theme) automatically, rather than a hardcoded color.
@@ -747,8 +747,9 @@ Default `NavRenderer` for the desktop scenario — builds a full `SideNav` hiera
 
 Default `NavRenderer`s for the tablet (both orientations) and phone scenarios respectively: a
 primary icon bar (rail or bottom bar) with a "More" overflow `Popover` when more root sections
-exist than fit, plus a shared two-level drill-down bar in `NavSlots.headerNav()` — the same
-drill-down bar every built-in touch/rail renderer uses, including `ScrollingTouchNavRenderer`/
+exist than fit, plus a shared drill-down bar in `NavSlots.headerNav()` for nested routes, however
+deep they go — the same drill-down bar every built-in touch/rail renderer uses, including
+`ScrollingTouchNavRenderer`/
 `ExpandingTouchNavRenderer` below. Both public, no-arg constructors, sharing their implementation
 internally.
 
@@ -786,7 +787,7 @@ Alternative `NavRenderer` for `NavType.HEADER`: root sections render as a `Tabs`
 `NavSlots.tabStrip()`, spanning the header alongside brand/user content, instead of a drawer,
 rail, or bottom bar. Selecting a leaf navigates directly; selecting a group only reveals that
 root's own children in the same shared drill-down bar every other touch/rail renderer uses, via
-`NavSlots.headerNav()` — it never navigates on its own, at either level, and losing focus on the
+`NavSlots.headerNav()` — it never navigates on its own, at any level, and losing focus on the
 whole nav hierarchy without ever landing on a leaf restores both rows to the real current view.
 Public, no-arg constructor.
 

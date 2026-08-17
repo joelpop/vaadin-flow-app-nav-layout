@@ -6,7 +6,8 @@ import com.vaadin.flow.component.orderedlayout.FlexLayout;
 /**
  * Default {@link NavRenderer} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#TOUCH}
  * — a bottom icon bar in {@link NavSlots#touchBar()}, with a "More" overflow trigger when more
- * root sections exist than fit, plus a two-level drill-down bar in {@link NavSlots#headerNav()}.
+ * root sections exist than fit, plus a drill-down bar in {@link NavSlots#headerNav()} for nested
+ * routes, however deep they go.
  *
  * <p>Override {@link #createOverflowComponent} to replace what's shown in response to tapping
  * the "More" trigger (e.g. a {@code Dialog}) while keeping everything else unchanged.
