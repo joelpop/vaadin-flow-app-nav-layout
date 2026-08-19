@@ -68,15 +68,43 @@ GLOBAL_STYLES.replaceSync(`
         }
     }
 
-    /* Lumo's own app-layout theme sets padding-top: var(--safe-area-inset-top) on the generic
-       [part~='navbar'] selector — correct for navbar-top, which sits behind the status bar/
-       notch — but its own navbar-bottom override never resets padding-top back down. Since
-       navbar-bottom also carries the "navbar" part token, the bottom bar inherits the TOP
-       bar's safe-area inset as its own top padding, inflating its height for no reason (the
-       bottom bar's top edge isn't behind anything unsafe). Applies to the ordinary touch bar
-       too, not just the rail — this isn't nav-rail-scoped. */
+    /* A theme that follows AppLayout's own [part~='navbar'] convention (Lumo does; a custom
+       theme or the base theme might not) sets padding-top: var(--safe-area-inset-top) there —
+       correct for navbar-top, which sits behind the status bar/notch — but its own navbar-bottom
+       override never resets padding-top back down. Since navbar-bottom also carries the "navbar"
+       part token, the bottom bar inherits the TOP bar's safe-area inset as its own top padding,
+       inflating its height for no reason (the bottom bar's top edge isn't behind anything
+       unsafe). Written unconditionally, not gated on which theme is active, since there's no
+       reliable way to detect that from CSS — a no-op under a theme (or no theme) that doesn't
+       have this quirk, a real fix under one that does. Applies to the ordinary touch bar too,
+       not just the rail — this isn't nav-rail-scoped. */
     vaadin-app-layout::part(navbar-bottom) {
         padding-top: var(--vaadin-app-layout-navbar-padding-top, var(--vaadin-padding-s));
+    }
+
+    /* Under Lumo specifically (measured directly on a real device; a different theme, or no
+       theme, may not carry this at all), navbar-bottom also carries a min-height (--lumo-size-xl,
+       56px) sized for a generic touch target — taller than this add-on's own row actually needs
+       once its items' own margin/label padding are trimmed above (down to ~41px). Zeroed
+       unconditionally rather than only under Lumo specifically, for the same reason as the
+       padding-top rule above: nothing here can reliably detect which theme, if any, is active,
+       and zeroing an already-zero min-height is harmless. Zeroed directly rather than
+       just repositioned (an earlier version of this rule only set align-items:flex-end, moving
+       the resulting slack from below the row to above it — real, measured improvement, but the
+       slack itself was still there, just relocated, not gone): min-height doesn't actually
+       protect anything here, since each button already sizes itself from its own content,
+       independent of this outer box's own height, so there's nothing this floor is guarding
+       that removing it would put at risk. align-items:flex-end stays anyway, defensively — if
+       anything else ever reintroduces slack here, this keeps it landing as room above the icons
+       rather than as dead space between them and the swipe indicator. Rail excluded: its own
+       navbar-bottom rule below already pins content full-height via inset-block-start/end, not
+       via align-items or min-height. ExpandingTouchNavRenderer also needs to override this one
+       specific property back to flex-start for its own reason (see expanding-touch-nav.css's own
+       comment) — its own selector is deliberately more specific than this one, so it reliably
+       wins there regardless of load order. */
+    vaadin-app-layout:not([nav-rail])::part(navbar-bottom) {
+        align-items: flex-end;
+        min-height: 0;
     }
 
     /* Force overlay drawer mode on rail devices (portrait tablet exceeds the 800px media query).
@@ -180,7 +208,7 @@ GLOBAL_STYLES.replaceSync(`
        Java (AbstractTouchNavRenderer.ensureBuilt), since they depend on which of the two touch
        renderers (rail vs. bottom bar) is active. No gap here (unlike the bottom bar): once each
        item's own height correctly fits its content (see vaadin-button.touch-nav-item below,
-       instead of being clipped down to Lumo's fixed default), items already read as comfortably
+       instead of being clipped down to a theme's own fixed default), items already read as comfortably
        separated on their own, and an explicit gap on top reads as excessive. */
     vaadin-app-layout[nav-rail] .nav-bar {
         gap: 0;
@@ -195,38 +223,100 @@ GLOBAL_STYLES.replaceSync(`
         row-gap: var(--vaadin-gap-m);
     }
 
-    /* This is a real vaadin-button. Plain CSS properties give it a transparent background and no
-       border, rendering correctly under any theme, or none at all — see this file's own header
-       comment on why this file sticks to generic --vaadin-* tokens throughout. */
-    .touch-nav-item {
+    /* Shared "erase default vaadin-button chrome" reset, written unconditionally rather than
+       scoped to a specific theme — there's no reliable way for CSS here to know whether Lumo,
+       Aura, a fully custom theme, or none at all is active, and every property below is a no-op
+       under a theme (or lack of one) whose own default already matches. Every plain icon/icon+
+       label button this add-on builds needs the exact same handful of resets, whether it's a
+       regular nav item (.touch-nav-item, built by NavItem and shared by every renderer from the
+       touch bar to every rail variant) or one of the two custom chevrons neither ScrollingTouchNavRenderer nor
+       ExpandingTouchNavRenderer builds via NavItem (each deliberately avoids the "touch-nav-item"
+       class itself — see those files' own comments on why: its own :not(.active) rule would mute
+       a chevron's color permanently, and a chevron is never itself a route item). Written once,
+       here, rather than copy-pasted per chevron class: that's what let the Scrolling chevrons'
+       own margin go unreset for a while after .touch-nav-item's own margin was fixed — the two
+       were never actually kept in sync, just coincidentally similar. Plain CSS properties give
+       every one of these buttons a transparent background and no border, rendering correctly
+       under any theme, or none at all — see this file's own header comment on why this file
+       sticks to generic --vaadin-* tokens throughout. */
+    .touch-nav-item,
+    .scrolling-touch-nav-chevron-left,
+    .scrolling-touch-nav-chevron-right,
+    .expanding-touch-nav-chevron {
         background: transparent;
         border: none;
-        /* Overrides the flex-item default (min-width:auto, which pins the shrink floor to the
-           label's un-wrapped width) so an item can shrink below its own natural content width
-           and .touch-nav-label's ellipsis can engage instead of forcing the bar/rail wider than
-           intended — see NavItem's own comment for the full story. */
+        /* Overrides the flex-item default (min-width:auto, which pins the shrink floor to a
+           regular item's own un-wrapped label width) so it can shrink below its own natural
+           content width and .touch-nav-label's ellipsis can engage instead of forcing the
+           bar/rail wider than intended — see NavItem's own comment for the full story. A no-op
+           for the two chevrons, which never wrap a label the same way, but harmless either way. */
         min-width: 0;
         padding: 0;
     }
 
-    /* Lumo's own :host sets an explicit height (a fixed theme-scale value, not "auto"), which
-       silently clips this button's own slotted content — icon+label, sized via NavItem's own
-       .touch-nav-content, plus the shadow DOM's own ::part(label) padding — whenever their
-       combined real height exceeds that fixed value. Ordinarily invisible (the clipped portion
-       just never paints, no error, no visible artifact), except when this button sits inside a container
-       that scrolls (FlyoutRailNavRenderer's own flyouts): there, the sliver of content this rule
-       used to clip instead of accommodate shows up as spurious overflow, forcing a scrollbar for
-       content that should have fit. vaadin-button.touch-nav-item (tag+class) gives this rule
-       higher specificity than the plain :host selector's own (0,1,0), the same specificity-bump
-       technique used elsewhere in this add-on to win a cascade fight without !important. */
-    vaadin-button.touch-nav-item {
+    /* The base button component's own default (confirmed by reading @vaadin/button's own base
+       styles directly) is height: fit-content — already theme-agnostic and non-clipping, so this
+       rule is a no-op there. Lumo's own theme, specifically, overrides that to an explicit fixed
+       theme-scale value instead, which silently clips this button's own slotted content whenever
+       its real height exceeds that fixed value. Ordinarily invisible under Lumo (the clipped
+       portion just never paints, no error, no visible artifact), except when this button sits
+       inside a container that scrolls (FlyoutRailNavRenderer's own flyouts): there, the sliver of
+       content Lumo's own rule would otherwise clip instead of accommodate shows up as spurious
+       overflow, forcing a scrollbar for content that should have fit. Written unconditionally
+       (not gated on Lumo specifically being the active theme) for the same reason as the rules
+       above it. The tag+class selector (rather than the bare class) gives this higher specificity
+       than a theme's own :host selector, the same specificity-bump technique used elsewhere in
+       this add-on to win a cascade fight without !important. expanding-touch-nav-chevron isn't
+       included here — it sets its own explicit height:100% for a genuinely different reason
+       (filling its 44px circle exactly), not "auto", so it keeps that in its own file with the
+       same tag+class technique. */
+    vaadin-button.touch-nav-item,
+    vaadin-button.scrolling-touch-nav-chevron-left,
+    vaadin-button.scrolling-touch-nav-chevron-right {
         height: auto;
+    }
+
+    /* The button's own default block margin (4px top and bottom, measured directly on a real
+       device) — left over from each of these being a real vaadin-button rather than a bare,
+       unstyled element. For the row-direction bottom bar, .nav-bar's own row-gap already
+       provides its own spacing between items, so this only ever added dead space above and
+       below each one's own content on top of that; the two chevrons never appear in rail mode at
+       all, so they get this unconditionally. .touch-nav-item alone stays rail-scoped — rail mode
+       relies on each item's own natural margin for its own inter-item spacing (see the
+       [nav-rail] .nav-bar rule above, which deliberately sets gap:0 for exactly that reason);
+       zeroing margin for rail too collapsed stacked rail items together with no visible gap
+       between them. */
+    vaadin-app-layout:not([nav-rail]) .touch-nav-item,
+    .scrolling-touch-nav-chevron-left,
+    .scrolling-touch-nav-chevron-right,
+    .expanding-touch-nav-chevron {
+        margin: 0;
     }
 
     /* Row-direction (bottom bar) items share the bar's width equally; column-direction (rail)
        items are stretched to the rail's own width by the rail's own align-items:stretch instead. */
     vaadin-app-layout:not([nav-rail]) .touch-nav-item {
         flex: 1 1 0;
+    }
+
+    /* Under Lumo specifically (measured directly on a real device; the base theme's own
+       [part="label"] carries no such padding, per @vaadin/button's own base styles), this part
+       carries its own padding-top/padding-bottom (6px each) — a separate box from the button's
+       own (already zeroed above), reached only through ::part(), not by any plain class
+       selector. Zeroed unconditionally, not gated on Lumo specifically, for the same reason as
+       every other rule in this block. Every one of these buttons
+       is built via Vaadin's Button(Component) constructor (NavItem's own icon+label Div for a
+       regular item; a similar icon(+placeholder) Div for each chevron), which routes that
+       content into this same shadow part regardless — so all of them carry this same hidden
+       padding, not just regular items. height:auto/height:100% above then sizes each button to
+       match its own content, padding included — a real, extra 12px this add-on never intended,
+       invisible until inspected directly. Same rail exception as margin above, for the same
+       reason. */
+    vaadin-app-layout:not([nav-rail]) vaadin-button.touch-nav-item::part(label),
+    vaadin-button.scrolling-touch-nav-chevron-left::part(label),
+    vaadin-button.scrolling-touch-nav-chevron-right::part(label),
+    vaadin-button.expanding-touch-nav-chevron::part(label) {
+        padding-block: 0;
     }
 
     /* Icon+label layout for both touch/rail items and overflow-popover items lives on this inner

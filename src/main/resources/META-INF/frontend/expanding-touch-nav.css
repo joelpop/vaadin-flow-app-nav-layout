@@ -5,13 +5,20 @@
  * icon's own center exactly on AppLayout's real navbar-bottom/content boundary, not on this
  * container's own top edge (the two aren't the same point — see that method's comment for why).
  *
- * navbar-bottom's own align-items is forced from its default center to flex-start: with center,
- * the primary bar's own top edge drifts relative to the boundary above as this container's total
- * height changes between collapsed/expanded, even though every padding value involved is a
- * constant, theme-driven one that doesn't itself change with expand state. flex-start keeps that
- * edge fixed regardless of how tall this container's content gets.
+ * navbar-bottom's own align-items needs to be flex-start, not app-nav-layout.ts's own default
+ * flex-end (which puts slotted content at the bar's bottom edge, for every other touch renderer)
+ * nor a theme's own default center: with either of those, this container's own top edge drifts
+ * relative to the boundary above as its total height changes between collapsed/expanded, even
+ * though every padding value involved is a constant, theme-driven one that doesn't itself change
+ * with expand state. flex-start keeps that edge fixed regardless of how tall this container's
+ * content gets. :has(.expanding-touch-nav) scopes this to exactly the case that needs it — this
+ * container is always the sole thing slotted into navbar-bottom when this renderer is active —
+ * and, combined with :not([nav-rail]), makes this selector strictly more specific than app-nav-
+ * layout.ts's own :not([nav-rail])::part(navbar-bottom) rule, so this reliably wins regardless of
+ * which stylesheet happens to load/adopt last (the same cross-file specificity concern that rule
+ * itself already calls out for a different property).
  */
-vaadin-app-layout::part(navbar-bottom) {
+vaadin-app-layout:not([nav-rail]):has(.expanding-touch-nav)::part(navbar-bottom) {
     align-items: flex-start;
 }
 
@@ -21,13 +28,15 @@ vaadin-app-layout::part(navbar-bottom) {
        not whatever ancestor outside this add-on's control happens to be the nearest positioned
        one otherwise. */
     position: relative;
-    /* Vertical space between this column's own direct children — the primary bar and the
-       overflow section, when both are present. Matches .nav-bar's own row-gap (app-nav-
-       layout.ts) so the gap above the primary bar's row and the gaps between the overflow
-       section's own wrapped rows read as the same rhythm, not two different spacings next to
-       each other. The chevron row doesn't participate — it's position:absolute, out of this
-       column's flow entirely. */
-    gap: var(--vaadin-gap-m);
+    /* Not gap: flexbox gap applies between every in-flow sibling regardless of whether one of
+       them is currently 0 height, so a plain gap here would add a full --vaadin-gap-m of dead
+       space below the primary bar even while collapsed — the overflow section (below) stays
+       mounted at all times (so its own max-height transition has something continuous to
+       animate), it's just visually collapsed to 0 height, not removed from flow. Confirmed
+       directly: deleting either the overflow section or this gap made the collapsed state
+       measure correctly. The gap this would have provided is applied instead as the overflow
+       section's own margin-top, conditionally, only once expanded — see that rule below. */
+    gap: 0;
 }
 
 .expanding-touch-nav-chevron-row {
@@ -83,36 +92,68 @@ vaadin-app-layout::part(navbar-bottom) {
     justify-content: center;
 }
 
+/* Fills the circle above completely, so the button's own click/keyboard hit area matches the
+   full 44px circle. The tag+class selector (rather than the bare class) gives this a higher
+   specificity than a theme's own :host (Lumo's, specifically, sets an explicit height there) —
+   a plain class selector alone ties with :host's own specificity, decided only by which
+   stylesheet loads last; qualifying with the tag name here settles it outright instead, and is a
+   no-op under a theme without that quirk. expanding-touch-nav-chevron-circle above carries the
+   visible shape (background, border); clip-path here is what actually excludes this button's own
+   square corners from hit-testing — CSS Masking specifies that clip-path excludes the clipped
+   region from pointer events, not just paint, unlike border-radius + overflow on the wrapper,
+   which is why that alone isn't relied on for this. This element's width and height are both
+   already pinned to the same 44px value via the rule above, so there's nothing for a circle()
+   radius calculation to get wrong deriving one from the other. The chrome reset every plain nav
+   button needs otherwise (background/border/padding/min-width/margin, ::part(label) padding)
+   lives in app-nav-layout.ts's own shared rules, keyed off this class name alongside
+   .touch-nav-item and the Scrolling touch bar's own chevrons — so expanding-touch-nav-chevron-
+   circle's own background/border (above) show through this button correctly without repeating
+   that reset here; width/height/clip-path stay in this file since they're genuinely unique to
+   this button's own circular shape. */
 vaadin-button.expanding-touch-nav-chevron {
-    /* Fills the circle above completely, so the button's own click/keyboard hit area matches
-       the full 44px circle. The tag+class selector (rather than the bare class) gives this a
-       higher specificity than Lumo's own :host, which sets an explicit height — a plain class
-       selector alone ties with :host's own specificity, decided only by which stylesheet loads
-       last; qualifying with the tag name here settles it outright instead.
-       expanding-touch-nav-chevron-circle above carries the visible shape (background, border);
-       clip-path here is what actually excludes this button's own square corners from
-       hit-testing — CSS Masking specifies that clip-path excludes the clipped region from
-       pointer events, not just paint, unlike border-radius + overflow on the wrapper, which is
-       why that alone isn't relied on for this. This element's width and height are both already
-       pinned to the same 44px value via the rule above, so there's nothing for a circle() radius
-       calculation to get wrong deriving one from the other. padding:0 keeps the icon centered
-       within this button's own box, overriding the button's own default padding (sized for a
-       text label, not an icon-only button). background/border are reset to transparent/none, so
-       expanding-touch-nav-chevron-circle's own background/border (above) show through instead. */
     width: 100%;
     height: 100%;
     clip-path: circle(50%);
-    padding: 0;
-    background: transparent;
-    border: none;
 }
 
+/* grid-template-rows:0fr, not max-height:0 — a single grid row sized in fr units always resolves
+   to exactly its own content's real natural height at every point of the transition below, since
+   there's only one row competing for the available space, so there's nothing to guess and
+   nothing to measure. A flat max-height guess (e.g. 40vh) doesn't have that property: its own
+   real, visible growth finishes as soon as the animated value exceeds the section's actual
+   (almost always much shorter) content height, however much sooner than the declared duration
+   that happens to be for the current item count — while margin-top below, transitioning
+   linearly over that same declared duration regardless, keeps moving well after max-height's own
+   motion had already finished, the two visibly falling out of step. grid-template-rows doesn't
+   have that mismatch: it's always proportional to the real content, so it and margin-top read as
+   one smooth, single motion together. */
 .expanding-touch-nav-overflow {
-    max-height: 0;
+    display: grid;
+    grid-template-rows: 0fr;
+    /* Matches .nav-bar's own row-gap (app-nav-layout.ts) so the space above this section and the
+       gaps between its own wrapped rows read as the same rhythm, not two different spacings next
+       to each other — see .expanding-touch-nav's own comment on why this lives here, as a
+       conditional margin, rather than as that column's own unconditional gap. 0 while collapsed:
+       nothing to space out from the primary bar above when this section has no visible height
+       anyway. */
+    margin-top: 0;
+    transition: grid-template-rows 0.25s ease, margin-top 0.25s ease;
+}
+
+/* The grid row's own animated height only visibly clips its content if the content itself
+   shrinks along with it — a grid item defaults to min-height:auto, which floors it at its own
+   content's full height regardless of how small the row's own animated fr value gets, silently
+   defeating the collapse entirely. min-height:0 lifts that floor; overflow:hidden then actually
+   clips whatever of the content no longer fits as the row shrinks, the same role it played
+   directly on .expanding-touch-nav-overflow itself before this became a grid. Scoped to this
+   specific parent/child relationship (a direct-child selector), not a blanket .nav-bar rule, so
+   this doesn't touch the primary bar's own .nav-bar or any other renderer's. */
+.expanding-touch-nav-overflow > .nav-bar {
     overflow: hidden;
-    transition: max-height 0.25s ease;
+    min-height: 0;
 }
 
 .expanding-touch-nav.expanded .expanding-touch-nav-overflow {
-    max-height: 40vh;
+    grid-template-rows: 1fr;
+    margin-top: var(--vaadin-gap-m);
 }

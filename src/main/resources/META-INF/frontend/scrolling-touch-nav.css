@@ -27,9 +27,11 @@
    the button's own plain default text color, the same as an .active regular item's (see
    app-nav-layout.ts's own active/inactive rule) — a chevron is never itself .active (it isn't a
    route item), so it always reads at that full, un-muted strength.
-   background/border/padding/min-width are reset directly here rather than by also giving the
-   chevron the "touch-nav-item" class itself, since that class's own :not(.active) rule would
-   permanently mute the chevron's color. */
+   The chrome reset every plain nav button needs (background/border/padding/min-width/margin,
+   height:auto, ::part(label) padding) lives in app-nav-layout.ts's own shared rules, keyed off
+   this class name alongside .touch-nav-item and .expanding-touch-nav-chevron, rather than
+   repeated here — this chevron deliberately never carries the "touch-nav-item" class itself,
+   since that class's own :not(.active) rule would permanently mute the chevron's color. */
 .scrolling-touch-nav-chevron-left,
 .scrolling-touch-nav-chevron-right {
     display: flex;
@@ -40,25 +42,6 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease, flex-basis 0.2s ease;
-    background: transparent;
-    border: none;
-    padding: 0;
-    min-width: 0;
-}
-
-/* Lumo's own :host still pins this button to its old fixed height, the same clipping app-nav-
-   layout.ts's own vaadin-button.touch-nav-item rule fixes for a regular item — but this button
-   deliberately never carries that class (see the comment above), so it needs the same fix
-   restated here rather than inherited. Without it, a regular item now grows via height:auto to
-   fit its own content while the chevron stays pinned to the theme's old fixed height; on
-   .scrolling-touch-nav-wrapper's own align-items:stretch, an item with an explicit height doesn't
-   actually stretch, so the chevron ends up sitting at the top of the (now taller) row instead of
-   centered in it. vaadin-button.scrolling-touch-nav-chevron-left/-right (tag+class) gives this
-   rule higher specificity than the plain :host selector's own, the same technique
-   app-nav-layout.ts uses for the regular item's own rule. */
-vaadin-button.scrolling-touch-nav-chevron-left,
-vaadin-button.scrolling-touch-nav-chevron-right {
-    height: auto;
 }
 
 /* Reserves a real label's line-box height (see ScrollingTouchNavRenderer's own comment) without
