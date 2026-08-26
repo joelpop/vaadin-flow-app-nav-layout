@@ -88,7 +88,8 @@ final class HeaderNavStrategy implements NavStrategy {
     public void populate() {
         var slots = new NavSlotsImpl(inertSlot, inertSlot, inertSlot, headerNavSlot, tabStripSlot);
         var context = new NavRenderContextImpl(
-                owner.navGrouper, owner.navigationSignal.peek().getPath(), slots, owner.navPathMatcher);
+                owner.navGrouper, owner.navigationSignal.peek().getPath(), slots, owner.navPathMatcher,
+                owner.navItemFilter);
         owner.activeRenderer.render(context);
     }
 

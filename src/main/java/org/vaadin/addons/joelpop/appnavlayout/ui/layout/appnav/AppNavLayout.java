@@ -28,7 +28,6 @@ import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.AfterNavigationEvent;
 import com.vaadin.flow.router.AfterNavigationObserver;
 import com.vaadin.flow.router.Location;
-import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.signals.Signal;
@@ -40,6 +39,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -147,6 +147,7 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     private Function<MenuEntry, String>                             viewTitleGenerator     = m -> null;
     private Function<MenuEntry, NavGroup>                           viewNavGroupResolver   = m -> null;
     BiPredicate<String, String>                                     navPathMatcher         = String::equals;
+    Predicate<MenuEntry>                                            navItemFilter          = entry -> true;
     private boolean                                                 navMatchNested         = false;
     // The lambdas forward to the mutable viewNavGroupResolver/viewIconGenerator fields above
     // rather than closing over their initial (no-op) values, so setViewNavGroupResolver()/
@@ -317,8 +318,10 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
     }
 
     private void populateNav() {
-        // Pre-warm NavGroup-based nodes so path-based siblings merge with them.
-        MenuConfiguration.getMenuEntries().stream()
+        // Pre-warm NavGroup-based nodes so path-based siblings merge with them. Excluded entries
+        // are filtered out here too, before nodeFor ever sees them — same reason every other
+        // nodeFor call site does, see NavRenderContext.navItemFilter()'s own doc.
+        RootNavSupport.menuEntries(navItemFilter).stream()
                 .filter(e -> viewNavGroupResolver.apply(e) != null)
                 .forEach(navGrouper::nodeFor);
 
@@ -388,6 +391,28 @@ public abstract class AppNavLayout extends AppLayout implements AfterNavigationO
      */
     protected void setNavPathMatcher(BiPredicate<String, String> matcher) {
         navPathMatcher = matcher;
+        repopulateNav();
+    }
+
+    /**
+     * Overrides the predicate deciding whether a given {@code MenuEntry} appears in the nav
+     * tree at all — for hiding a view the current user lacks permission for, one only relevant
+     * on certain devices, or for any other reason a view shouldn't be offered as a navigation
+     * target right now. Default: {@code entry -> true} (every {@code @Menu}-annotated view is
+     * shown).
+     *
+     * <p>Applies uniformly everywhere the nav tree is built or an active item is matched — an
+     * excluded entry is invisible to every renderer, not merely skipped when building the
+     * visible list. A group whose every entry ends up excluded doesn't appear either: a group
+     * node only ever exists because a real entry underneath it was processed, so a group with
+     * nothing left under it is never created in the first place.
+     *
+     * <p>Re-evaluated on every nav repopulation (each navigation, and whenever a nav
+     * configuration setter is called) — safe to base this on session-scoped, potentially
+     * changing state such as the current user's permissions.
+     */
+    protected void setNavItemFilter(Predicate<MenuEntry> filter) {
+        navItemFilter = filter;
         repopulateNav();
     }
 

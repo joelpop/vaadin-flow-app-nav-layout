@@ -17,7 +17,6 @@ import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.popover.Popover;
 import com.vaadin.flow.component.popover.PopoverVariant;
-import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.signals.Signal;
 
@@ -26,6 +25,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -48,6 +48,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     private final FlexLayout.FlexDirection direction;
 
     private NavGrouper navGrouper;
+    private Predicate<MenuEntry> navItemFilter = entry -> true;
     // The path render() was last called with — needed so the resize-driven Signal.effect below
     // (which can fire independently of render(), e.g. a phone rotating without a NavType change)
     // can re-apply active highlighting after it rebuilds items, not just on the next navigation.
@@ -95,6 +96,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     @Override
     public void render(NavRenderContext context) {
         this.navGrouper = context.navGrouper();
+        this.navItemFilter = context.navItemFilter();
         this.currentPath = context.currentPath();
         ensureBuilt(context.slots());
         buildItems();
@@ -177,7 +179,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
         overflowNode = null;
 
         var rootRoutes = new LinkedHashMap<NavNode, MenuEntry>();
-        for (var entry : MenuConfiguration.getMenuEntries()) {
+        for (var entry : RootNavSupport.menuEntries(navItemFilter)) {
             rootRoutes.putIfAbsent(rootNodeFor(entry), entry);
         }
         var all = new ArrayList<>(rootRoutes.entrySet());
@@ -206,7 +208,7 @@ abstract class AbstractTouchNavRenderer implements NavRenderer {
     }
 
     private void highlightActive(String path) {
-        var currentRootNode = MenuConfiguration.getMenuEntries().stream()
+        var currentRootNode = RootNavSupport.menuEntries(navItemFilter).stream()
                 .filter(e -> owner.navPathMatcher.test(path, RouteNavUtils.normalizedPath(e)))
                 .max(Comparator.comparingInt(e -> RouteNavUtils.pathSegments(RouteNavUtils.normalizedPath(e)).size()))
                 .map(this::rootNodeFor)

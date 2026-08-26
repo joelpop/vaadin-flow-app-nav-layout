@@ -15,22 +15,42 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
- * Shared nav-tree utilities for {@link NavRenderer}s in this package. {@link #rootOf},
- * {@link #collectRootNodes}, and {@link #activeRootFor} collapse every entry to one item per
- * root section, regardless of how deep its actual route nests — used by
- * {@link ScrollingTouchNavRenderer}, {@link ExpandingTouchNavRenderer}, and
- * {@link HeaderTabsNavRenderer}. Not used by {@link AbstractTouchNavRenderer}'s own renderers,
- * whose active-highlighting has an extra "More" overflow-trigger case these don't need.
- * {@link #childrenOf} and {@link #activeChainFor} don't collapse to root — they're for renderers
- * that show the tree at every depth, such as {@link FlyoutRailNavRenderer} and
- * {@link SecondaryTabBar}. {@link #firstChildOf} works at any depth, not just root — a group
- * node's first navigable descendant, wherever in the tree that group actually sits.
+ * Shared nav-tree utilities for {@link NavRenderer}s in this package. {@link #menuEntries}
+ * (both overloads) is the single place {@code MenuConfiguration.getMenuEntries()} gets filtered
+ * against {@link NavRenderContext#navItemFilter()} — every other method here, and every renderer
+ * that builds a nav tree, reads entries through it rather than calling
+ * {@code MenuConfiguration.getMenuEntries()} directly, so an excluded entry never reaches a
+ * {@code NavGrouper}'s own {@code nodeFor}. {@link #rootOf}, {@link #collectRootNodes}, and
+ * {@link #activeRootFor} collapse every entry to one item per root section, regardless of how
+ * deep its actual route nests — used by {@link ScrollingTouchNavRenderer},
+ * {@link ExpandingTouchNavRenderer}, and {@link HeaderTabsNavRenderer}. Not used by
+ * {@link AbstractTouchNavRenderer}'s own renderers, whose active-highlighting has an extra
+ * "More" overflow-trigger case these don't need — those instead call the {@code Predicate}
+ * overload of {@link #menuEntries} directly. {@link #childrenOf} and {@link #activeChainFor}
+ * don't collapse to root — they're for renderers that show the tree at every depth, such as
+ * {@link FlyoutRailNavRenderer} and {@link SecondaryTabBar}. {@link #firstChildOf} works at any
+ * depth, not just root — a group node's first navigable descendant, wherever in the tree that
+ * group actually sits.
  */
 final class RootNavSupport {
 
     private RootNavSupport() {}
+
+    /** {@code MenuConfiguration.getMenuEntries()}, filtered against {@code context}'s own
+     *  {@link NavRenderContext#navItemFilter()}. */
+    static List<MenuEntry> menuEntries(NavRenderContext context) {
+        return menuEntries(context.navItemFilter());
+    }
+
+    /** Same as {@link #menuEntries(NavRenderContext)}, for a caller (currently only
+     *  {@link AbstractTouchNavRenderer}) that caches the filter itself rather than holding onto
+     *  a whole {@link NavRenderContext}. */
+    static List<MenuEntry> menuEntries(Predicate<MenuEntry> filter) {
+        return MenuConfiguration.getMenuEntries().stream().filter(filter).toList();
+    }
 
     /** Walks {@code node}'s parent chain up to its top-level root group or leaf. */
     static NavNode rootOf(NavNode node) {
@@ -41,10 +61,10 @@ final class RootNavSupport {
         return current;
     }
 
-    /** One {@link NavNode} per distinct root section, in {@code MenuConfiguration.getMenuEntries()}'s own order. */
+    /** One {@link NavNode} per distinct root section, in {@link #menuEntries}'s own order. */
     static List<NavNode> collectRootNodes(NavRenderContext context) {
         var seen = new LinkedHashMap<NavNode, MenuEntry>();
-        for (var entry : MenuConfiguration.getMenuEntries()) {
+        for (var entry : menuEntries(context)) {
             var node = context.navGrouper().nodeFor(entry);
             seen.putIfAbsent(rootOf(node), entry);
         }
@@ -57,7 +77,7 @@ final class RootNavSupport {
      *  direct child — {@code groupNode} itself might have no directly routable child of its own,
      *  only grandchildren or deeper. */
     private static Optional<MenuEntry> firstChildEntryOf(NavNode groupNode, NavRenderContext context) {
-        return MenuConfiguration.getMenuEntries().stream()
+        return menuEntries(context).stream()
                 .filter(e -> hasAncestor(context.navGrouper().nodeFor(e), groupNode))
                 .filter(e -> e.menuClass() != null)
                 .findFirst();
@@ -91,7 +111,7 @@ final class RootNavSupport {
      */
     static NavNode activeRootFor(NavRenderContext context) {
         var path = context.currentPath();
-        return MenuConfiguration.getMenuEntries().stream()
+        return menuEntries(context).stream()
                 .filter(e -> context.navPathMatcher().test(path, RouteNavUtils.normalizedPath(e)))
                 .max(Comparator.comparingInt(e -> RouteNavUtils.pathSegments(RouteNavUtils.normalizedPath(e)).size()))
                 .map(e -> rootOf(context.navGrouper().nodeFor(e)))
@@ -107,7 +127,7 @@ final class RootNavSupport {
     static Map<NavNode, List<NavNode>> childrenOf(NavRenderContext context) {
         var children = new LinkedHashMap<NavNode, List<NavNode>>();
         var seen = new HashSet<NavNode>();
-        for (var entry : MenuConfiguration.getMenuEntries()) {
+        for (var entry : menuEntries(context)) {
             registerWithAncestors(context.navGrouper().nodeFor(entry), children, seen);
         }
         return children;
@@ -134,7 +154,7 @@ final class RootNavSupport {
     static Set<NavNode> activeChainFor(NavRenderContext context) {
         var path = context.currentPath();
         var chain = new LinkedHashSet<NavNode>();
-        MenuConfiguration.getMenuEntries().stream()
+        menuEntries(context).stream()
                 .filter(e -> context.navPathMatcher().test(path, RouteNavUtils.normalizedPath(e)))
                 .max(Comparator.comparingInt(e -> RouteNavUtils.pathSegments(RouteNavUtils.normalizedPath(e)).size()))
                 .ifPresent(e -> {

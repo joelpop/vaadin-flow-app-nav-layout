@@ -6,9 +6,10 @@ import org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType;
 import com.vaadin.flow.component.HasComponents;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
-import com.vaadin.flow.server.menu.MenuConfiguration;
+import com.vaadin.flow.server.menu.MenuEntry;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 
 /**
  * Default {@link NavRenderer} for {@link org.vaadin.addons.joelpop.appnavlayout.ui.nav.NavType#SIDENAV}
@@ -52,14 +53,14 @@ public class SideNavDrawerNavRenderer implements NavRenderer {
             drawer.add(sideNav);
             attachedDrawerSlot = drawer;
         }
-        populateSideNav(context.navGrouper());
+        populateSideNav(context.navGrouper(), RootNavSupport.menuEntries(context));
     }
 
-    private void populateSideNav(NavGrouper navGrouper) {
+    private void populateSideNav(NavGrouper navGrouper, List<MenuEntry> entries) {
         sideNav.removeAll();
         var sideNavItems = new LinkedHashMap<NavNode, SideNavItem>();
 
-        MenuConfiguration.getMenuEntries().forEach(entry -> {
+        entries.forEach(entry -> {
             var node = navGrouper.nodeFor(entry);
             ensureAncestors(node, sideNavItems);
             var item = owner.navNodeRenderer.createComponent(node);

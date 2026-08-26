@@ -333,6 +333,35 @@ public class MainLayout extends AppNavLayout {
 }
 ```
 
+### Excluding nav items
+
+Some views shouldn't appear in the nav tree at all for a given user or device — most often a permission the current user lacks, or a view that only makes sense on certain devices.
+
+#### Default behavior
+
+By default, every entry `MenuConfiguration.getMenuEntries()` returns appears in the nav tree — `setNavItemFilter` defaults to a predicate that returns `true` for every `MenuEntry`.
+
+#### Supplying a nav item filter
+
+To exclude entries, supply a predicate via `setNavItemFilter` — `false` excludes the entry from every nav surface (touch bar, rail, desktop drawer), `true` includes it. The following example excludes views the current user's roles don't grant access to, via each view's own `@RolesAllowed`:
+
+```java
+@Layout
+public class MainLayout extends AppNavLayout {
+
+    public MainLayout() {
+
+        setNavItemFilter(entry -> {
+            var rolesAllowed = entry.menuClass().getAnnotation(RolesAllowed.class);
+            return rolesAllowed == null
+                    || Arrays.stream(rolesAllowed.value()).anyMatch(this::currentUserHasRole);
+        });
+    }
+}
+```
+
+If every entry belonging to a nav group is excluded this way, the group itself doesn't appear either — a group only ever exists in the tree as a side effect of an included entry beneath it.
+
 ### Nav renderers
 
 Which chrome a scenario gets (drawer, bottom bar, rail, or header tab strip) comes from whichever `NavRenderer` is configured for it, not from a separate choice.
@@ -615,6 +644,7 @@ See [Nav renderers](#nav-renderers) for configuring each of these pieces, and [A
 - **Custom icon/title/grouping** — drive labels, icons, and grouping from your own annotations instead of `@Menu`, via `setViewIconGenerator`/`setViewTitleGenerator`/`setViewNavGroupResolver`.
 - **Custom grouping strategy** — replace `PathPrefixNavGrouper` entirely with your own `NavGrouper`.
 - **Custom active-item matching** — override path matching for touch/rail highlighting (`setNavPathMatcher`), or nested-route match behavior for desktop `SideNav` highlighting (`setNavMatchNested`).
+- **Nav item exclusion** — hide individual views from the nav tree via `setNavItemFilter`, e.g. for permission- or device-based visibility. A group left entirely excluded disappears too.
 - **Per-scenario renderers** — independently swap the `NavRenderer` for any of the five device/orientation scenarios, or set both orientations of tablet/phone at once.
 - **Partial overrides** — subclass a built-in renderer to change just one behavior, e.g. override `createOverflowComponent()` to replace the "More" popover with your own presentation.
 - **Built-in phone touch bar alternatives** — `ScrollingTouchNavRenderer`/`ExpandingTouchNavRenderer` ship two ready-made, fully separate renderers for the phone scenario, each with its own overflow presentation (a scrolling strip, an expanding grid) — no subclassing required.
@@ -645,6 +675,7 @@ Configuration setters (protected — call from the subclass constructor or later
 | `setUserMenu(Component)`                                      | —                      | User widget: header trailing (desktop) or drawer bottom (mobile).                                                                                                                  |
 | `setNavPathMatcher(BiPredicate<String, String>)`              | `String::equals`       | Active-item path matching for touch/rail highlighting only — desktop `SideNav` highlights via Vaadin's own router matching.                                                        |
 | `setNavMatchNested(boolean)`                                  | `false`                | Whether desktop `SideNavItem`s use `setMatchNested`, so a parent stays highlighted while any child route is active.                                                                |
+| `setNavItemFilter(Predicate<MenuEntry>)`                      | `entry -> true`        | Whether a given `MenuEntry` appears in the nav tree at all — `false` excludes it, on every nav surface. A group left with no included entries doesn't appear either.               |
 | `setNavGrouper(NavGrouper)`                                   | `PathPrefixNavGrouper` | Full grouping strategy override. **Severs** the automatic wiring to `setViewNavGroupResolver`/`setViewIconGenerator` — configure a custom grouper directly before passing it here. |
 | `setNavNodeRenderer(ComponentRenderer<SideNavItem, NavNode>)` | built-in               | Custom desktop `SideNavItem` renderer.                                                                                                                                             |
 | `setViewNavGroupResolver(Function<MenuEntry, NavGroup>)`      | path-based (`null`)    | Explicit group assignment for a view; return `null` for path-based grouping. Only takes effect through the default `PathPrefixNavGrouper`.                                         |
@@ -724,6 +755,7 @@ Passed to `NavRenderer.render(...)`.
 | `currentPath()`    | The path of the currently active navigation, leading `/` stripped.                                                                                                                                               |
 | `slots()`          | The full set of named locations available to render into.                                                                                                                                                        |
 | `navPathMatcher()` | The configured `setNavPathMatcher` predicate. A renderer that compares paths itself for active-item matching should test against this rather than hardcoding its own comparison, or `setNavPathMatcher` silently won't affect it. |
+| `navItemFilter()`  | The configured `setNavItemFilter` predicate. A renderer that reads `MenuConfiguration.getMenuEntries()` itself should filter against this first, or `setNavItemFilter` silently won't affect it. |
 
 ### `NavSlots`
 
